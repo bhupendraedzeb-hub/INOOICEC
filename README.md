@@ -24,9 +24,9 @@ Open [http://localhost:3000](http://localhost:3000).
 - `pnpm dev` — dev server
 - `pnpm build` — production build
 - `pnpm lint` — ESLint
-- `pnpm vitest` — unit tests (once added in Phase 8)
+- `pnpm test` — unit tests (Vitest; currently covers `fieldResolver`/`fieldRegistry`, growing through Phase 8/17)
 - `pnpm playwright test` — integration/E2E/PDF tests (once added in Phase 17)
 
 ## Current status
 
-Phases 0-5 done: project scaffold, core foundation (auth, DB, audit log, API base), company settings, customers/products master data, the template data model, and the visual drag-and-drop template builder (dnd-kit-based canvas + shared TemplateRenderer). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes — including a documented testing-tool limitation around palette drag-and-drop that's worth a manual check. Next up: Phase 6 (Dynamic Fields).
+Phases 0-6 done: project scaffold, core foundation (auth, DB, audit log, API base), company settings, customers/products master data, the template data model, the visual drag-and-drop template builder, and dynamic field binding (field registry/resolver + "Insert Field" picker). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes — including a documented testing-tool limitation around palette drag-and-drop that's worth a manual check. Next up: Phase 7 (Invoice Items Table).
