@@ -14,10 +14,11 @@ export class ApiError extends Error {
   }
 }
 
-type AuthedHandler<TBody> = (ctx: {
+type AuthedHandler<TBody, TParams> = (ctx: {
   request: NextRequest;
   session: Session;
   body: TBody;
+  params: TParams;
 }) => Promise<NextResponse>;
 
 type WithAuthedJsonOptions = {
@@ -29,13 +30,14 @@ type WithAuthedJsonOptions = {
 // Phase 1 scope: session-auth only. The dual session+API-key resolver
 // (resolveRequestAuth) is introduced in Phase 14 once ApiKey issuance exists;
 // this wrapper is the shared error-handling/Zod pattern every /api/v1 route
-// will build on.
-export function withAuthedJson<TBody>(
+// will build on. TParams covers dynamic segments (e.g. { id: string } for
+// /api/v1/customers/[id]); routes with no dynamic segments can ignore it.
+export function withAuthedJson<TBody, TParams = Record<string, never>>(
   schema: ZodType<TBody> | null,
-  handler: AuthedHandler<TBody>,
+  handler: AuthedHandler<TBody, TParams>,
   options: WithAuthedJsonOptions = {},
 ) {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, context?: { params: Promise<TParams> }) => {
     try {
       const session = await auth();
       if (!session?.user) {
@@ -58,7 +60,8 @@ export function withAuthedJson<TBody>(
         body = parsed.data;
       }
 
-      return await handler({ request, session, body });
+      const params = context ? await context.params : ({} as TParams);
+      return await handler({ request, session, body, params });
     } catch (err) {
       if (err instanceof ApiError) {
         return NextResponse.json({ error: err.message }, { status: err.status });

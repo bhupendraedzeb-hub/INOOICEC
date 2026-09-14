@@ -132,6 +132,46 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3 — Customers & Products (reusable master data for invoice creation)
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id              String  @id @default(cuid())
+  name            String
+  companyName     String?
+  gstin           String?
+  pan             String?
+  billingAddress  String?
+  shippingAddress String?
+  state           String?
+  stateCode       String?
+  phone           String?
+  email           String?
+  isArchived      Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  hsnSac      String?
+  defaultRate Decimal @db.Decimal(14, 2)
+  gstRate     Decimal @db.Decimal(5, 2)
+  unit        String?
+  isArchived  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
 model ApiKey {
   id          String    @id @default(cuid())
   label       String

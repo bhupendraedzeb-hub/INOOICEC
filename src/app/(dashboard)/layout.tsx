@@ -13,6 +13,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/dashboard" className="hover:text-zinc-950 dark:hover:text-zinc-50">
             Dashboard
           </Link>
+          <Link href="/customers" className="hover:text-zinc-950 dark:hover:text-zinc-50">
+            Customers
+          </Link>
+          <Link href="/products" className="hover:text-zinc-950 dark:hover:text-zinc-50">
+            Products
+          </Link>
           <Link href="/settings/company" className="hover:text-zinc-950 dark:hover:text-zinc-50">
             Company Settings
           </Link>
