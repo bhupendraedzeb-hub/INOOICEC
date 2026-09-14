@@ -29,4 +29,4 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current status
 
-Phase 0 (project scaffold) and Phase 1 (core foundation: auth, DB, audit log, API base) done — see `plan.md` for the full phase-by-phase roadmap, current progress, and two implementation corrections made in Phase 1. Next up: Phase 2 (Company & Business Settings).
+Phases 0-2 done: project scaffold, core foundation (auth, DB, audit log, API base), and company settings (first real UI: login + authenticated dashboard shell + settings form). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes. Next up: Phase 3 (Customers & Products).

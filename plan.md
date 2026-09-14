@@ -205,7 +205,9 @@ Single pure module, `src/lib/calc/gstEngine.ts` — no DB/Next.js imports, fully
 
 Also note: `pnpm add prisma` resolved a `prisma` CLI at `8.0.0-rc.14`, which turned out to be a "Prisma Platform" CLI (`prisma deploy`, `prisma project`, `prisma postgres`, contract/branch/service commands) — a different, cloud-platform-oriented product, not the plain self-hosted ORM workflow this app needs. Pinned `prisma`/`@prisma/client` to the matching stable `7.10.0` instead, which keeps the traditional `schema.prisma` + `prisma migrate dev` workflow this plan assumes throughout.
 
-**Phase 2 — Company & Business Settings.** `CompanySettings` singleton CRUD (identity, address, GSTIN/PAN, bank details, UPI, currency, invoice numbering format), `OWNER/ADMIN`-gated.
+**Phase 2 — Company & Business Settings. ✅ Done.** `CompanySettings` singleton CRUD (identity, address, GSTIN/PAN, bank details, UPI, currency, invoice numbering format), `OWNER/ADMIN`-gated via a new `roles` option on `withAuthedJson`. Also added the first real UI: `/login` (credentials server action), an authenticated `(dashboard)` layout with sign-out, and `/settings/company` (react-hook-form + zod, read-only for STAFF). *Files:* `src/lib/services/companySettings.ts`, `src/lib/validation/schemas/companySettings.ts`, `src/app/api/v1/settings/company/route.ts`, `src/app/(auth)/login/page.tsx`, `src/app/(dashboard)/layout.tsx`, `src/app/(dashboard)/settings/company/page.tsx`, `src/components/settings/CompanySettingsForm.tsx`.
+
+*Verified:* unauthenticated `/dashboard` and `/settings/company` redirect to `/login`; OWNER can GET and PUT company settings and the change persists; a throwaway STAFF user can GET (200) but is blocked on PUT (403 Forbidden) — role-gating confirmed working, then the test user was deleted.
 
 **Phase 3 — Customers & Products.** `Customer`/`Product` models + migration; full CRUD + search + soft-archive; UI; ready for selection in Phase 9's invoice form.
 
