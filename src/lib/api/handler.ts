@@ -20,16 +20,29 @@ type AuthedHandler<TBody> = (ctx: {
   body: TBody;
 }) => Promise<NextResponse>;
 
+type WithAuthedJsonOptions = {
+  // Restrict the route to specific roles (e.g. ["OWNER", "ADMIN"]). Omit to
+  // allow any authenticated user.
+  roles?: string[];
+};
+
 // Phase 1 scope: session-auth only. The dual session+API-key resolver
 // (resolveRequestAuth) is introduced in Phase 14 once ApiKey issuance exists;
 // this wrapper is the shared error-handling/Zod pattern every /api/v1 route
 // will build on.
-export function withAuthedJson<TBody>(schema: ZodType<TBody> | null, handler: AuthedHandler<TBody>) {
+export function withAuthedJson<TBody>(
+  schema: ZodType<TBody> | null,
+  handler: AuthedHandler<TBody>,
+  options: WithAuthedJsonOptions = {},
+) {
   return async (request: NextRequest) => {
     try {
       const session = await auth();
       if (!session?.user) {
         throw new ApiError(401, "Unauthorized");
+      }
+      if (options.roles && !options.roles.includes(session.user.role)) {
+        throw new ApiError(403, "Forbidden");
       }
 
       let body = undefined as TBody;
