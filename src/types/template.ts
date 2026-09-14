@@ -95,6 +95,11 @@ export type ComponentProps =
 export type ComponentNode = {
   id: string;
   type: ComponentType;
+  // Position/size are all millimeters, matching page.marginXMm — the same
+  // units print CSS (@page, mm-based) uses natively. This is what lets the
+  // builder canvas, browser preview, and Playwright PDF output stay pixel/mm
+  // consistent without any unit conversion at render time (only the builder's
+  // *editing* UI converts mm<->px, purely for on-screen dragging).
   x: number;
   y: number;
   width: number;

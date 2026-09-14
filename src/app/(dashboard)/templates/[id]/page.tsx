@@ -18,7 +18,15 @@ export default async function EditTemplatePage({
     <div className="max-w-xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Edit Template</h1>
-        <TemplateActions templateId={template.id} />
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/templates/${template.id}/builder`}
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          >
+            Open Builder
+          </Link>
+          <TemplateActions templateId={template.id} />
+        </div>
       </div>
       <div className="mt-6">
         <TemplateForm
