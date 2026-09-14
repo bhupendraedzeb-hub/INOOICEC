@@ -209,7 +209,9 @@ Also note: `pnpm add prisma` resolved a `prisma` CLI at `8.0.0-rc.14`, which tur
 
 *Verified:* unauthenticated `/dashboard` and `/settings/company` redirect to `/login`; OWNER can GET and PUT company settings and the change persists; a throwaway STAFF user can GET (200) but is blocked on PUT (403 Forbidden) — role-gating confirmed working, then the test user was deleted.
 
-**Phase 3 — Customers & Products.** `Customer`/`Product` models + migration; full CRUD + search + soft-archive; UI; ready for selection in Phase 9's invoice form.
+**Phase 3 — Customers & Products. ✅ Done.** `Customer`/`Product` models + migration; full CRUD + search + soft-archive, exposed via `/api/v1/customers(/[id])` and `/api/v1/products(/[id])`; list/create/edit UI under `(dashboard)/customers` and `(dashboard)/products`, nav links added. `withAuthedJson` extended to forward Next 16's async dynamic-route `params` so the shared wrapper covers `/[id]` routes too. Product money fields (`defaultRate`, `gstRate`) validated as decimal strings across the API boundary, not JS numbers. *Files:* `src/lib/services/customers.ts`, `src/lib/services/products.ts`, `src/lib/validation/schemas/customer.ts`, `src/lib/validation/schemas/product.ts`, `src/app/api/v1/customers/*`, `src/app/api/v1/products/*`, `src/app/(dashboard)/customers/*`, `src/app/(dashboard)/products/*`.
+
+*Verified:* create/list-with-search/get/update pass for both resources; archiving a customer hides it from the default list and `includeArchived=true` still shows it; an invalid decimal (`"not-a-number"`) on a product's rate is rejected with 422; all six UI pages (list/new/edit × customers/products) return 200; test records created during verification were deleted afterward.
 
 **Phase 4 — Template Data Model.** `Template`/`TemplateVersion` models + migration; Template JSON schema + Zod validator; CRUD for `Template` metadata; enforce immutability at the data-access layer (updates always insert a new `TemplateVersion`, never mutate an existing one).
 
