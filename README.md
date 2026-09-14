@@ -29,4 +29,4 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current status
 
-Phases 0-3 done: project scaffold, core foundation (auth, DB, audit log, API base), company settings, and customers/products master data (full CRUD + search + archive, both API and UI). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes. Next up: Phase 4 (Template Data Model).
+Phases 0-4 done: project scaffold, core foundation (auth, DB, audit log, API base), company settings, customers/products master data, and the template data model (Template/TemplateVersion, immutable versioning, JSON schema + Zod validation, metadata CRUD UI). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes. Next up: Phase 5 (Visual Template Builder).
