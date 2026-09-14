@@ -10,9 +10,14 @@ Core architecture:
 
 The system must also expose an internal REST API so LeadSquared, payment systems, LMS, website, and other internal applications can create and update invoices without directly accessing the database.
 
+> **Status:** Phases 0–6 are done (see `✅ Done` markers below). Detailed
+> per-phase notes — what was built, how it was verified, and any
+> implementation deviations from this spec — live in `plan.md` at the repo
+> root, not in this file. This file stays the original phase spec.
+
 ---
 
-# Phase 0 — Project Assessment & Foundation
+# Phase 0 — Project Assessment & Foundation ✅ Done
 
 ## Objective
 Understand the existing repository before making major changes.
@@ -41,7 +46,7 @@ Create/update a short technical assessment before major implementation.
 
 ---
 
-# Phase 1 — Core Application Foundation
+# Phase 1 — Core Application Foundation ✅ Done
 
 ## Objective
 Create the stable base of the internal invoice platform.
@@ -79,7 +84,7 @@ Application can authenticate users and provide a protected `/api/v1` API.
 
 ---
 
-# Phase 2 — Company & Business Settings
+# Phase 2 — Company & Business Settings ✅ Done
 
 ## Objective
 Configure the business information used throughout invoices.
@@ -117,7 +122,7 @@ Company settings can be created, edited, validated, and used by invoice template
 
 ---
 
-# Phase 3 — Customers & Products
+# Phase 3 — Customers & Products ✅ Done
 
 ## Objective
 Create reusable master data for invoice generation.
@@ -166,7 +171,7 @@ Invoice creation can auto-populate customer and product information.
 
 ---
 
-# Phase 4 — Template Data Model
+# Phase 4 — Template Data Model ✅ Done
 
 ## Objective
 Build the template system before building the visual editor.
@@ -229,7 +234,7 @@ Editing a template later must never change an old invoice.
 
 ---
 
-# Phase 5 — Visual Template Builder
+# Phase 5 — Visual Template Builder ✅ Done
 
 ## Objective
 Build the main drag-and-drop invoice editor.
@@ -315,7 +320,7 @@ A user can visually build and save an invoice template without manually writing 
 
 ---
 
-# Phase 6 — Dynamic Fields
+# Phase 6 — Dynamic Fields ✅ Done
 
 ## Objective
 Connect visual template components to invoice data.
