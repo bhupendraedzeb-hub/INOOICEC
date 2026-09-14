@@ -12,6 +12,7 @@ import type {
   BaseStyle,
 } from "@/types/template";
 import { COMPONENT_LABELS } from "@/components/builder/componentDefaults";
+import { FieldPicker } from "@/components/builder/FieldPicker";
 
 type Props = {
   component: ComponentNode | null;
@@ -115,24 +116,89 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
 
       {c.type === "text" && (
         <Field label="Text content">
-          <textarea
-            className={inputCls}
-            rows={3}
-            value={(c.props as TextProps).content.map((r) => (typeof r === "string" ? r : `{{${r.path}}}`)).join("")}
-            onChange={(e) => updateProps<TextProps>({ content: [e.target.value] })}
-          />
+          <div className="flex flex-col gap-1.5">
+            {(c.props as TextProps).content.map((run, i) => {
+              const content = (c.props as TextProps).content;
+              return (
+                <div key={i} className="flex items-center gap-1">
+                  {typeof run === "string" ? (
+                    <input
+                      className={`${inputCls} flex-1`}
+                      value={run}
+                      onChange={(e) => {
+                        const next = [...content];
+                        next[i] = e.target.value;
+                        updateProps<TextProps>({ content: next });
+                      }}
+                    />
+                  ) : (
+                    <span className="flex-1 truncate rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                      {`{{${run.path}}}`}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => updateProps<TextProps>({ content: content.filter((_, idx) => idx !== i) })}
+                    className="text-xs text-red-600 dark:text-red-400"
+                    aria-label="Remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  updateProps<TextProps>({ content: [...(c.props as TextProps).content, ""] })
+                }
+                className="text-xs text-zinc-600 underline dark:text-zinc-400"
+              >
+                + Add text
+              </button>
+              <FieldPicker
+                allowedTypes={["text", "date", "currency"]}
+                onSelect={(path) =>
+                  updateProps<TextProps>({
+                    content: [...(c.props as TextProps).content, { kind: "field", path }],
+                  })
+                }
+              />
+            </div>
+          </div>
         </Field>
       )}
 
       {c.type === "image" && (
         <>
-          <Field label="Image URL">
-            <input
-              className={inputCls}
-              value={typeof (c.props as ImageProps).src === "string" ? ((c.props as ImageProps).src as string) : ""}
-              onChange={(e) => updateProps<ImageProps>({ src: e.target.value })}
-            />
+          <Field label="Image source">
+            {typeof (c.props as ImageProps).src === "object" ? (
+              <div className="flex items-center gap-2">
+                <span className="flex-1 truncate rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                  {`{{${((c.props as ImageProps).src as { path: string }).path}}}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateProps<ImageProps>({ src: "" })}
+                  className="text-xs text-red-600 dark:text-red-400"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <input
+                className={inputCls}
+                placeholder="https://…"
+                value={(c.props as ImageProps).src as string}
+                onChange={(e) => updateProps<ImageProps>({ src: e.target.value })}
+              />
+            )}
           </Field>
+          <FieldPicker
+            allowedTypes={["image"]}
+            onSelect={(path) => updateProps<ImageProps>({ src: { kind: "field", path } })}
+          />
           <Field label="Fit">
             <select
               className={inputCls}
@@ -182,16 +248,37 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
       )}
 
       {c.type === "qrcode" && (
-        <Field label="Source">
-          <select
-            className={inputCls}
-            value={typeof (c.props as QrCodeProps).source === "string" ? ((c.props as QrCodeProps).source as string) : "upi"}
-            onChange={(e) => updateProps<QrCodeProps>({ source: e.target.value as "upi" | "customUrl" })}
-          >
-            <option value="upi">Company UPI</option>
-            <option value="customUrl">Custom URL</option>
-          </select>
-        </Field>
+        <>
+          <Field label="Source">
+            {typeof (c.props as QrCodeProps).source === "object" ? (
+              <div className="flex items-center gap-2">
+                <span className="flex-1 truncate rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                  {`{{${((c.props as QrCodeProps).source as { field: { path: string } }).field.path}}}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => updateProps<QrCodeProps>({ source: "upi" })}
+                  className="text-xs text-red-600 dark:text-red-400"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : (
+              <select
+                className={inputCls}
+                value={(c.props as QrCodeProps).source as "upi" | "customUrl"}
+                onChange={(e) => updateProps<QrCodeProps>({ source: e.target.value as "upi" | "customUrl" })}
+              >
+                <option value="upi">Company UPI</option>
+                <option value="customUrl">Custom URL</option>
+              </select>
+            )}
+          </Field>
+          <FieldPicker
+            allowedTypes={["text"]}
+            onSelect={(path) => updateProps<QrCodeProps>({ source: { field: { kind: "field", path } } })}
+          />
+        </>
       )}
 
       {c.type === "itemsTable" && (

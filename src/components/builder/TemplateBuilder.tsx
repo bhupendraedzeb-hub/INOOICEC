@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -9,6 +9,7 @@ import { Canvas, CSS_PX_PER_MM } from "@/components/builder/Canvas";
 import { PropertiesPanel } from "@/components/builder/PropertiesPanel";
 import { createDefaultComponent } from "@/components/builder/componentDefaults";
 import { TemplateRenderer } from "@/lib/render/TemplateRenderer";
+import { findUnknownFieldPathsInDocument } from "@/lib/render/fieldResolver";
 import type { ComponentNode, ComponentType, TemplateDocument } from "@/types/template";
 
 const ZOOM_LEVELS = [0.5, 0.7, 1, 1.25];
@@ -33,6 +34,7 @@ export function TemplateBuilder({
   const [versionNumber, setVersionNumber] = useState(initialVersionNumber);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const unknownFieldPaths = useMemo(() => findUnknownFieldPathsInDocument(document), [document]);
 
   const commit = useCallback(
     (updater: (doc: TemplateDocument) => TemplateDocument) => {
@@ -204,6 +206,13 @@ export function TemplateBuilder({
           </button>
         </div>
       </div>
+
+      {unknownFieldPaths.length > 0 && (
+        <div className="border-b border-amber-300 bg-amber-50 px-4 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          Unknown field path{unknownFieldPaths.length > 1 ? "s" : ""}: {unknownFieldPaths.join(", ")} — these
+          won&apos;t resolve to a value.
+        </div>
+      )}
 
       {previewMode ? (
         <div className="flex-1 overflow-auto bg-zinc-100 p-8 dark:bg-zinc-950">

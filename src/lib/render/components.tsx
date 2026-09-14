@@ -8,29 +8,33 @@ import type {
   TextProps,
   DividerProps,
 } from "@/types/template";
+import { resolveFieldRef, type RenderContext } from "@/lib/render/fieldResolver";
 
-// Phase 5 scope: no real invoice/business/customer data exists yet (that's
-// Phase 6 field resolution + Phase 9 invoice data), so dynamic content and
-// invoice-bound structural components render as clearly-labeled placeholders.
-// A FieldRef always renders as a chip showing its path, never a resolved
-// value, until fieldResolver.ts (Phase 6) is wired in.
+// Invoice-bound structural components still render as clearly-labeled
+// placeholders (real invoice data is Phase 9). FieldRef *values*, however,
+// resolve for real when a RenderContext is supplied (Phase 6); with no
+// context — the builder's design-mode canvas — a FieldRef renders as a chip
+// showing its path instead of a value.
 
-function RichContentView({ content }: { content: RichContent }) {
+function FieldChip({ path }: { path: string }) {
+  return (
+    <span
+      className="rounded bg-blue-100 px-1 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+      style={{ fontSize: "0.85em" }}
+    >
+      {`{{${path}}}`}
+    </span>
+  );
+}
+
+function RichContentView({ content, context }: { content: RichContent; context?: RenderContext }) {
   return (
     <>
-      {content.map((run, i) =>
-        typeof run === "string" ? (
-          <span key={i}>{run}</span>
-        ) : (
-          <span
-            key={i}
-            className="rounded bg-blue-100 px-1 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-            style={{ fontSize: "0.85em" }}
-          >
-            {`{{${run.path}}}`}
-          </span>
-        ),
-      )}
+      {content.map((run, i) => {
+        if (typeof run === "string") return <span key={i}>{run}</span>;
+        const resolved = resolveFieldRef(run, context);
+        return resolved !== undefined ? <span key={i}>{resolved}</span> : <FieldChip key={i} path={run.path} />;
+      })}
     </>
   );
 }
@@ -120,8 +124,24 @@ function ShapeView({ props }: { props: ShapeProps }) {
   );
 }
 
-function QrCodeView({ props }: { props: QrCodeProps }) {
-  const label = props.source === "upi" ? "QR: UPI" : props.source === "customUrl" ? "QR: URL" : "QR: field";
+function QrCodeView({ props, context }: { props: QrCodeProps; context?: RenderContext }) {
+  if (typeof props.source === "object") {
+    const resolved = resolveFieldRef(props.source.field, context);
+    if (resolved) {
+      return (
+        <div className="flex h-full w-full flex-col items-center justify-center border border-zinc-300 bg-white p-1 text-center text-[9px] text-zinc-500 dark:border-zinc-700">
+          <span>QR</span>
+          <span className="truncate">{resolved}</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-full w-full items-center justify-center border border-zinc-300 bg-white text-[10px] text-zinc-400 dark:border-zinc-700">
+        <FieldChip path={props.source.field.path} />
+      </div>
+    );
+  }
+  const label = props.source === "upi" ? "QR: UPI" : "QR: URL";
   return (
     <div className="flex h-full w-full items-center justify-center border border-zinc-300 bg-white text-[10px] text-zinc-400 dark:border-zinc-700">
       {label}
@@ -129,15 +149,27 @@ function QrCodeView({ props }: { props: QrCodeProps }) {
   );
 }
 
-function ImageView({ props }: { props: ImageProps }) {
-  if (typeof props.src === "string" && props.src) {
+function ImageView({ props, context }: { props: ImageProps; context?: RenderContext }) {
+  if (typeof props.src === "object") {
+    const resolved = resolveFieldRef(props.src, context);
+    if (resolved) {
+      // eslint-disable-next-line @next/next/no-img-element -- content is a user-provided/resolved arbitrary URL, not a local static asset
+      return <img src={resolved} alt="" className="h-full w-full" style={{ objectFit: props.fit ?? "contain" }} />;
+    }
+    return (
+      <div className="flex h-full w-full items-center justify-center border border-dashed border-zinc-300 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
+        <FieldChip path={props.src.path} />
+      </div>
+    );
+  }
+  if (props.src) {
     // eslint-disable-next-line @next/next/no-img-element -- content is a user-provided arbitrary URL, not a local static asset
     return <img src={props.src} alt="" className="h-full w-full" style={{ objectFit: props.fit ?? "contain" }} />;
   }
   return <StructuralPlaceholder label="Image" />;
 }
 
-export function ComponentContent({ component }: { component: ComponentNode }) {
+export function ComponentContent({ component, context }: { component: ComponentNode; context?: RenderContext }) {
   // ComponentNode.props is a plain ComponentProps union, not discriminated
   // against `type` at the TS level (the Zod schema is; mirroring that in the
   // TS type would mean converting ComponentNode itself into a discriminated
@@ -145,9 +177,9 @@ export function ComponentContent({ component }: { component: ComponentNode }) {
   // pattern PropertiesPanel already uses.
   switch (component.type) {
     case "text":
-      return <RichContentView content={(component.props as TextProps).content} />;
+      return <RichContentView content={(component.props as TextProps).content} context={context} />;
     case "image":
-      return <ImageView props={component.props as ImageProps} />;
+      return <ImageView props={component.props as ImageProps} context={context} />;
     case "logo":
       return <StructuralPlaceholder label="Logo" />;
     case "divider": {
@@ -157,7 +189,7 @@ export function ComponentContent({ component }: { component: ComponentNode }) {
     case "shape":
       return <ShapeView props={component.props as ShapeProps} />;
     case "qrcode":
-      return <QrCodeView props={component.props as QrCodeProps} />;
+      return <QrCodeView props={component.props as QrCodeProps} context={context} />;
     case "itemsTable":
       return <ItemsTableView props={component.props as ItemsTableProps} />;
     default:

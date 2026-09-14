@@ -1,6 +1,7 @@
 import type { CSSProperties, ComponentType, ReactNode } from "react";
 import type { BaseStyle, ComponentNode, ComponentProps, TemplateDocument } from "@/types/template";
 import { ComponentContent } from "@/lib/render/components";
+import type { RenderContext } from "@/lib/render/fieldResolver";
 
 // The shared render tree: the builder canvas, the invoice preview, and the
 // PDF print route (Phase 12) all render a TemplateDocument through this same
@@ -47,9 +48,14 @@ export function pageHeightMm(page: TemplateDocument["page"]) {
 
 export function TemplateRenderer({
   document,
+  context,
   Wrapper = DefaultWrapper,
 }: {
   document: TemplateDocument;
+  // Omit (design mode / builder canvas) to render FieldRefs as path chips;
+  // pass a real RenderContext (invoice preview, PDF — Phase 9+) to resolve
+  // them to actual values.
+  context?: RenderContext;
   Wrapper?: ComponentType<ComponentWrapperProps>;
 }) {
   const { page, components } = document;
@@ -82,7 +88,7 @@ export function TemplateRenderer({
           };
           return (
             <Wrapper key={c.id} component={c} style={style}>
-              <ComponentContent component={c} />
+              <ComponentContent component={c} context={context} />
             </Wrapper>
           );
         })}
