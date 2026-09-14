@@ -29,4 +29,4 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current status
 
-Phases 0-4 done: project scaffold, core foundation (auth, DB, audit log, API base), company settings, customers/products master data, and the template data model (Template/TemplateVersion, immutable versioning, JSON schema + Zod validation, metadata CRUD UI). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes. Next up: Phase 5 (Visual Template Builder).
+Phases 0-5 done: project scaffold, core foundation (auth, DB, audit log, API base), company settings, customers/products master data, the template data model, and the visual drag-and-drop template builder (dnd-kit-based canvas + shared TemplateRenderer). See `plan.md` for the full phase-by-phase roadmap, current progress, and implementation notes — including a documented testing-tool limitation around palette drag-and-drop that's worth a manual check. Next up: Phase 6 (Dynamic Fields).
