@@ -29,4 +29,4 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current status
 
-Phase 0 (project scaffold) in progress — see `plan.md` for the full phase-by-phase roadmap and current progress.
+Phase 0 (project scaffold) and Phase 1 (core foundation: auth, DB, audit log, API base) done — see `plan.md` for the full phase-by-phase roadmap, current progress, and two implementation corrections made in Phase 1. Next up: Phase 2 (Company & Business Settings).
