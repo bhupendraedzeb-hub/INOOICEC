@@ -37,10 +37,12 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  accounts  Account[]
-  sessions  Session[]
-  auditLogs AuditLog[]
-  apiKeys   ApiKey[]
+  accounts         Account[]
+  sessions         Session[]
+  auditLogs        AuditLog[]
+  apiKeys          ApiKey[]
+  createdTemplates Template[]        @relation("TemplateCreatedBy")
+  createdVersions  TemplateVersion[] @relation("TemplateVersionCreatedBy")
 }
 
 // NextAuth.js (Auth.js) v5 required models — Prisma adapter, database sessions.
@@ -170,6 +172,56 @@ model Product {
   updatedAt DateTime @updatedAt
 
   @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Template Data Model
+// ---------------------------------------------------------------------------
+
+enum TemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Template {
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  thumbnailUrl String?
+  status       TemplateStatus @default(DRAFT)
+  isDefault    Boolean        @default(false)
+
+  createdById String
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User              @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+  versions  TemplateVersion[]
+
+  @@index([status])
+}
+
+// Insert-only: a version, once created, is never updated or deleted (see
+// src/lib/services/templates.ts — there is deliberately no
+// updateTemplateVersion function). Once Invoices exist (Phase 9), issued
+// invoices pin a templateVersionId so edits to a Template after that point
+// can never retroactively change an already-issued invoice.
+model TemplateVersion {
+  id            String @id @default(cuid())
+  templateId    String
+  versionNumber Int
+  layout        Json
+
+  createdById String
+  createdAt   DateTime @default(now())
+
+  template  Template @relation(fields: [templateId], references: [id])
+  createdBy User     @relation("TemplateVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([templateId, versionNumber])
 }
 
 model ApiKey {
