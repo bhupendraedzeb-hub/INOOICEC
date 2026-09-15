@@ -49,6 +49,7 @@ export function pageHeightMm(page: TemplateDocument["page"]) {
 export function TemplateRenderer({
   document,
   context,
+  itemsTablePreviewRowCount,
   Wrapper = DefaultWrapper,
 }: {
   document: TemplateDocument;
@@ -56,6 +57,10 @@ export function TemplateRenderer({
   // pass a real RenderContext (invoice preview, PDF — Phase 9+) to resolve
   // them to actual values.
   context?: RenderContext;
+  // Builder-only knob for previewing an ItemsTable against a longer dummy
+  // list (Phase 7) before real invoice items exist (Phase 9). Not part of
+  // the saved template JSON.
+  itemsTablePreviewRowCount?: number;
   Wrapper?: ComponentType<ComponentWrapperProps>;
 }) {
   const { page, components } = document;
@@ -88,7 +93,7 @@ export function TemplateRenderer({
           };
           return (
             <Wrapper key={c.id} component={c} style={style}>
-              <ComponentContent component={c} context={context} />
+              <ComponentContent component={c} context={context} itemsTablePreviewRowCount={itemsTablePreviewRowCount} />
             </Wrapper>
           );
         })}

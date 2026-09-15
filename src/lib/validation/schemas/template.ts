@@ -76,7 +76,12 @@ const componentSchema = z.discriminatedUnion("type", [
     type: z.literal("itemsTable"),
     props: baseStyleSchema.extend({
       columns: z.array(
-        z.object({ key: itemsTableColumnKey, label: z.string().min(1), widthPercent: z.number().positive() }),
+        z.object({
+          key: itemsTableColumnKey,
+          label: z.string().min(1),
+          widthPercent: z.number().positive(),
+          align: z.enum(["left", "center", "right"]).optional(),
+        }),
       ),
       repeatHeaderOnEachPage: z.boolean(),
     }),

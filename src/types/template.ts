@@ -72,8 +72,17 @@ export type ItemsTableColumnKey =
   | "taxAmount"
   | "amount";
 
+export type ItemsTableColumn = {
+  key: ItemsTableColumnKey;
+  label: string;
+  widthPercent: number;
+  align?: "left" | "center" | "right";
+};
+
 export type ItemsTableProps = BaseStyle & {
-  columns: Array<{ key: ItemsTableColumnKey; label: string; widthPercent: number }>;
+  // Order of this array is column (left-to-right) order — reordering in the
+  // builder just reorders the array, no separate "position" field needed.
+  columns: ItemsTableColumn[];
   repeatHeaderOnEachPage: boolean;
 };
 

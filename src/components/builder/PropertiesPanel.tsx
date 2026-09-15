@@ -281,42 +281,116 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
         </>
       )}
 
-      {c.type === "itemsTable" && (
-        <div className="flex flex-col gap-2">
-          <Field label="Columns">
-            <div className="flex flex-col gap-1">
-              {ALL_COLUMN_KEYS.map(({ key, label }) => {
-                const cols = (c.props as ItemsTableProps).columns;
-                const idx = cols.findIndex((col) => col.key === key);
-                const checked = idx !== -1;
-                return (
-                  <label key={key} className="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+      {c.type === "itemsTable" && (() => {
+        const cols = (c.props as ItemsTableProps).columns;
+        const availableToAdd = ALL_COLUMN_KEYS.filter(({ key }) => !cols.some((col) => col.key === key));
+
+        function setColumns(next: typeof cols) {
+          updateProps<ItemsTableProps>({ columns: next });
+        }
+        function moveColumn(index: number, dir: -1 | 1) {
+          const target = index + dir;
+          if (target < 0 || target >= cols.length) return;
+          const next = [...cols];
+          [next[index], next[target]] = [next[target], next[index]];
+          setColumns(next);
+        }
+
+        return (
+          <div className="flex flex-col gap-2">
+            <Field label="Columns (order = left to right)">
+              <div className="flex flex-col gap-1.5">
+                {cols.map((col, i) => (
+                  <div key={col.key} className="flex items-center gap-1 rounded border border-zinc-200 p-1.5 dark:border-zinc-800">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        disabled={i === 0}
+                        onClick={() => moveColumn(i, -1)}
+                        className="text-[10px] leading-none text-zinc-500 disabled:opacity-30"
+                        aria-label="Move up"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        disabled={i === cols.length - 1}
+                        onClick={() => moveColumn(i, 1)}
+                        className="text-[10px] leading-none text-zinc-500 disabled:opacity-30"
+                        aria-label="Move down"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                    <span className="w-20 flex-shrink-0 truncate text-xs text-zinc-700 dark:text-zinc-300">
+                      {col.label}
+                    </span>
                     <input
-                      type="checkbox"
-                      checked={checked}
+                      type="number"
+                      min={1}
+                      value={col.widthPercent}
                       onChange={(e) => {
-                        const next = e.target.checked
-                          ? [...cols, { key, label, widthPercent: 10 }]
-                          : cols.filter((col) => col.key !== key);
-                        updateProps<ItemsTableProps>({ columns: next });
+                        const next = [...cols];
+                        next[i] = { ...col, widthPercent: Number(e.target.value) || 1 };
+                        setColumns(next);
                       }}
+                      title="Width %"
+                      className={`${inputCls} w-14`}
                     />
+                    <select
+                      value={col.align ?? "left"}
+                      onChange={(e) => {
+                        const next = [...cols];
+                        next[i] = { ...col, align: e.target.value as "left" | "center" | "right" };
+                        setColumns(next);
+                      }}
+                      className={`${inputCls} flex-1`}
+                    >
+                      <option value="left">Left</option>
+                      <option value="center">Center</option>
+                      <option value="right">Right</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setColumns(cols.filter((_, idx) => idx !== i))}
+                      className="text-xs text-red-600 dark:text-red-400"
+                      aria-label="Remove column"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Field>
+            {availableToAdd.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const def = availableToAdd.find((a) => a.key === e.target.value);
+                  if (def) setColumns([...cols, { key: def.key, label: def.label, widthPercent: 10, align: "left" }]);
+                }}
+                className={inputCls}
+              >
+                <option value="">+ Add column…</option>
+                {availableToAdd.map(({ key, label }) => (
+                  <option key={key} value={key}>
                     {label}
-                  </label>
-                );
-              })}
-            </div>
-          </Field>
-          <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
-            <input
-              type="checkbox"
-              checked={(c.props as ItemsTableProps).repeatHeaderOnEachPage}
-              onChange={(e) => updateProps<ItemsTableProps>({ repeatHeaderOnEachPage: e.target.checked })}
-            />
-            Repeat header on each page
-          </label>
-        </div>
-      )}
+                  </option>
+                ))}
+              </select>
+            )}
+            <label className="flex items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+              <input
+                type="checkbox"
+                checked={(c.props as ItemsTableProps).repeatHeaderOnEachPage}
+                onChange={(e) => updateProps<ItemsTableProps>({ repeatHeaderOnEachPage: e.target.checked })}
+              />
+              Repeat header on each page
+            </label>
+          </div>
+        );
+      })()}
 
       {!["image", "logo", "divider"].includes(c.type) && (
         <div className="flex flex-col gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">

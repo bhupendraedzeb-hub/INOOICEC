@@ -39,32 +39,47 @@ function RichContentView({ content, context }: { content: RichContent; context?:
   );
 }
 
-const SAMPLE_ITEMS_TABLE_ROWS = 3;
+const DEFAULT_SAMPLE_ROWS = 4;
 
-const ITEMS_TABLE_COLUMN_SAMPLE: Record<string, string> = {
-  index: "1",
-  item: "Sample Item",
-  description: "Description",
-  hsn: "9983",
-  qty: "1",
-  unit: "pcs",
-  rate: "0.00",
-  discount: "0.00",
-  gstPercent: "18%",
-  taxAmount: "0.00",
-  amount: "0.00",
-};
+// Deliberately longer than the other sample cells — proves the
+// "long descriptions" requirement (word-wrap within the cell, no overflow
+// breaking the table layout) without needing real invoice data yet.
+const SAMPLE_DESCRIPTION =
+  "Annual maintenance and support contract covering priority email/phone response and quarterly on-site review";
 
-function ItemsTableView({ props }: { props: ItemsTableProps }) {
+function itemsTableSampleValue(key: string, rowIndex: number): string {
+  if (key === "index") return String(rowIndex + 1);
+  if (key === "description") return SAMPLE_DESCRIPTION;
   return (
-    <table className="h-full w-full border-collapse text-xs">
+    {
+      item: "Sample Item",
+      hsn: "9983",
+      qty: "1",
+      unit: "pcs",
+      rate: "0.00",
+      discount: "0.00",
+      gstPercent: "18%",
+      taxAmount: "0.00",
+      amount: "0.00",
+    }[key] ?? ""
+  );
+}
+
+// previewRowCount is a builder-only rendering knob (not part of the saved
+// template JSON) — it exists so the multi-row/wrapping/print-readiness
+// behavior can be verified against a long dummy list before real invoice
+// data exists (Phase 9) or the PDF pipeline exists (Phase 12), which is the
+// only place actual page-break pagination can be verified for real.
+function ItemsTableView({ props, previewRowCount = DEFAULT_SAMPLE_ROWS }: { props: ItemsTableProps; previewRowCount?: number }) {
+  return (
+    <table className="h-full w-full border-collapse text-xs" style={{ tableLayout: "fixed" }}>
       <thead>
         <tr>
           {props.columns.map((col) => (
             <th
               key={col.key}
-              style={{ width: `${col.widthPercent}%` }}
-              className="border border-zinc-300 bg-zinc-100 px-1 py-0.5 text-left font-medium dark:border-zinc-700 dark:bg-zinc-800"
+              style={{ width: `${col.widthPercent}%`, textAlign: col.align ?? "left" }}
+              className="border border-zinc-300 bg-zinc-100 px-1 py-0.5 font-medium dark:border-zinc-700 dark:bg-zinc-800"
             >
               {col.label}
             </th>
@@ -72,11 +87,15 @@ function ItemsTableView({ props }: { props: ItemsTableProps }) {
         </tr>
       </thead>
       <tbody>
-        {Array.from({ length: SAMPLE_ITEMS_TABLE_ROWS }).map((_, i) => (
-          <tr key={i}>
+        {Array.from({ length: previewRowCount }).map((_, i) => (
+          <tr key={i} style={{ breakInside: "avoid" }}>
             {props.columns.map((col) => (
-              <td key={col.key} className="border border-zinc-200 px-1 py-0.5 text-zinc-400 dark:border-zinc-800">
-                {ITEMS_TABLE_COLUMN_SAMPLE[col.key] ?? ""}
+              <td
+                key={col.key}
+                style={{ textAlign: col.align ?? "left", whiteSpace: "normal", wordBreak: "break-word" }}
+                className="border border-zinc-200 px-1 py-0.5 align-top text-zinc-400 dark:border-zinc-800"
+              >
+                {itemsTableSampleValue(col.key, i)}
               </td>
             ))}
           </tr>
@@ -169,7 +188,15 @@ function ImageView({ props, context }: { props: ImageProps; context?: RenderCont
   return <StructuralPlaceholder label="Image" />;
 }
 
-export function ComponentContent({ component, context }: { component: ComponentNode; context?: RenderContext }) {
+export function ComponentContent({
+  component,
+  context,
+  itemsTablePreviewRowCount,
+}: {
+  component: ComponentNode;
+  context?: RenderContext;
+  itemsTablePreviewRowCount?: number;
+}) {
   // ComponentNode.props is a plain ComponentProps union, not discriminated
   // against `type` at the TS level (the Zod schema is; mirroring that in the
   // TS type would mean converting ComponentNode itself into a discriminated
@@ -191,7 +218,7 @@ export function ComponentContent({ component, context }: { component: ComponentN
     case "qrcode":
       return <QrCodeView props={component.props as QrCodeProps} context={context} />;
     case "itemsTable":
-      return <ItemsTableView props={component.props as ItemsTableProps} />;
+      return <ItemsTableView props={component.props as ItemsTableProps} previewRowCount={itemsTablePreviewRowCount} />;
     default:
       return <StructuralPlaceholder label={STRUCTURAL_LABELS[component.type] ?? component.type} />;
   }

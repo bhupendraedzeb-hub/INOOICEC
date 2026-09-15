@@ -100,6 +100,7 @@ export function Canvas({
   onSelect,
   onMoveBy,
   onResize,
+  itemsTablePreviewRowCount,
 }: {
   document: TemplateDocument;
   zoom: number;
@@ -107,6 +108,7 @@ export function Canvas({
   onSelect: (id: string | null) => void;
   onMoveBy: (id: string, dxMm: number, dyMm: number) => void;
   onResize: (id: string, widthMm: number, heightMm: number) => void;
+  itemsTablePreviewRowCount?: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "canvas" });
   const effectiveScale = CSS_PX_PER_MM * zoom;
@@ -125,7 +127,11 @@ export function Canvas({
       >
         <div style={{ width: `${pageWidthMm(document.page)}mm`, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
           <CanvasEditContext.Provider value={{ effectiveScale, zoom, selectedId, onSelect, onMoveBy, onResize }}>
-            <TemplateRenderer document={document} Wrapper={EditableWrapper} />
+            <TemplateRenderer
+              document={document}
+              Wrapper={EditableWrapper}
+              itemsTablePreviewRowCount={itemsTablePreviewRowCount}
+            />
           </CanvasEditContext.Provider>
         </div>
       </div>

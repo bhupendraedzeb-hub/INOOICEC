@@ -30,6 +30,7 @@ export function TemplateBuilder({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(0.7);
   const [previewMode, setPreviewMode] = useState(false);
+  const [itemsTablePreviewRowCount, setItemsTablePreviewRowCount] = useState(4);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [versionNumber, setVersionNumber] = useState(initialVersionNumber);
 
@@ -191,6 +192,18 @@ export function TemplateBuilder({
           >
             Preview
           </button>
+          <label className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Table rows:
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={itemsTablePreviewRowCount}
+              onChange={(e) => setItemsTablePreviewRowCount(Math.max(1, Number(e.target.value) || 1))}
+              className="w-14 rounded-md border border-zinc-300 px-1.5 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              title="Dummy row count for previewing an Items Table component — not saved with the template"
+            />
+          </label>
         </div>
         <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
           <span>v{versionNumber}</span>
@@ -217,7 +230,7 @@ export function TemplateBuilder({
       {previewMode ? (
         <div className="flex-1 overflow-auto bg-zinc-100 p-8 dark:bg-zinc-950">
           <div className="mx-auto shadow-lg" style={{ width: "210mm" }}>
-            <TemplateRenderer document={document} />
+            <TemplateRenderer document={document} itemsTablePreviewRowCount={itemsTablePreviewRowCount} />
           </div>
         </div>
       ) : (
@@ -231,6 +244,7 @@ export function TemplateBuilder({
               onSelect={setSelectedId}
               onMoveBy={moveComponentBy}
               onResize={resizeComponent}
+              itemsTablePreviewRowCount={itemsTablePreviewRowCount}
             />
             <PropertiesPanel
               component={selectedComponent()}
