@@ -680,7 +680,7 @@ Team can quickly understand invoice and payment status from one dashboard.
 
 ---
 
-# Phase 14 — REST API
+# Phase 14 — REST API ✅ Done
 
 ## Objective
 Allow internal systems to use the invoice platform programmatically.
