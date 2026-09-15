@@ -1,3 +1,4 @@
+import QRCode from "qrcode";
 import type {
   ComponentNode,
   RichContent,
@@ -9,6 +10,14 @@ import type {
   DividerProps,
 } from "@/types/template";
 import { resolveFieldRef, type RenderContext } from "@/lib/render/fieldResolver";
+
+// Shared shorthand used by every structural view below — resolves a
+// registered field path through the exact same fieldResolver.ts path
+// text/image/qrcode FieldRefs use, so currency/date formatting stays
+// consistent across the whole document.
+function field(path: string, context?: RenderContext): string | undefined {
+  return resolveFieldRef({ kind: "field", path }, context);
+}
 
 // Invoice-bound structural components still render as clearly-labeled
 // placeholders (real invoice data is Phase 9). FieldRef *values*, however,
@@ -76,10 +85,15 @@ function ItemsTableView({
   props,
   items,
   previewRowCount = DEFAULT_SAMPLE_ROWS,
+  showHeader = true,
 }: {
   props: ItemsTableProps;
   items?: RenderContext["items"];
   previewRowCount?: number;
+  // Multi-page-only knob (Phase 12's paginateDocument), not part of the
+  // saved template JSON — honors props.repeatHeaderOnEachPage by omitting
+  // the <thead> on every page after the first when that flag is false.
+  showHeader?: boolean;
 }) {
   const rows: Record<string, string>[] =
     items ?? Array.from({ length: previewRowCount }, (_, i) => Object.fromEntries(
@@ -88,19 +102,21 @@ function ItemsTableView({
 
   return (
     <table className="h-full w-full border-collapse text-xs" style={{ tableLayout: "fixed" }}>
-      <thead>
-        <tr>
-          {props.columns.map((col) => (
-            <th
-              key={col.key}
-              style={{ width: `${col.widthPercent}%`, textAlign: col.align ?? "left" }}
-              className="border border-zinc-300 bg-zinc-100 px-1 py-0.5 font-medium dark:border-zinc-700 dark:bg-zinc-800"
-            >
-              {col.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
+      {showHeader && (
+        <thead>
+          <tr>
+            {props.columns.map((col) => (
+              <th
+                key={col.key}
+                style={{ width: `${col.widthPercent}%`, textAlign: col.align ?? "left" }}
+                className="border border-zinc-300 bg-zinc-100 px-1 py-0.5 font-medium dark:border-zinc-700 dark:bg-zinc-800"
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+      )}
       <tbody>
         {rows.length === 0 && (
           <tr>
@@ -165,29 +181,78 @@ function ShapeView({ props }: { props: ShapeProps }) {
   );
 }
 
+// A real, scannable QR code rendered as inline SVG from qrcode's synchronous
+// low-level `create()` API (a plain module bitmatrix, not the async
+// toDataURL/toBuffer renderers) — this keeps every render path here fully
+// synchronous, which matters because ComponentContent/TemplateRenderer are
+// shared, non-async components used both from a "use client" live preview
+// (InvoicePreviewPane) and from the server-rendered PDF route; an async
+// component tree would break the client usage. SVG also prints losslessly at
+// any size, unlike a rasterized PNG.
+function QrSvg({ text }: { text: string }) {
+  const qr = QRCode.create(text, { errorCorrectionLevel: "M" });
+  const size = qr.modules.size;
+  const cells: { x: number; y: number }[] = [];
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      if (qr.modules.get(row, col)) cells.push({ x: col, y: row });
+    }
+  }
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full" shapeRendering="crispEdges">
+      <rect x={0} y={0} width={size} height={size} fill="#fff" />
+      <g fill="#000">
+        {cells.map((c) => (
+          <rect key={`${c.x}-${c.y}`} x={c.x} y={c.y} width={1} height={1} />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+function QrPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center border border-zinc-300 bg-white text-center text-[10px] text-zinc-400 dark:border-zinc-700">
+      {label}
+    </div>
+  );
+}
+
+// Builds a standard UPI deep-link payment URI (upi://pay?...) from whatever
+// of the invoice/business/payment context is available. Real UPI apps read
+// this on scan; missing pieces (e.g. no amount) are simply omitted rather
+// than encoding a broken/placeholder URI.
+function buildUpiUri(context: RenderContext): string | undefined {
+  const upi = context.payment.upi;
+  if (!upi) return undefined;
+  const params = new URLSearchParams({ pa: upi, cu: "INR" });
+  if (context.business.name) params.set("pn", context.business.name);
+  const amount = context.totals.balance ?? context.totals.grand_total;
+  if (amount) params.set("am", amount);
+  if (context.invoice.number) params.set("tn", `Invoice ${context.invoice.number}`);
+  return `upi://pay?${params.toString()}`;
+}
+
 function QrCodeView({ props, context }: { props: QrCodeProps; context?: RenderContext }) {
   if (typeof props.source === "object") {
     const resolved = resolveFieldRef(props.source.field, context);
-    if (resolved) {
-      return (
-        <div className="flex h-full w-full flex-col items-center justify-center border border-zinc-300 bg-white p-1 text-center text-[9px] text-zinc-500 dark:border-zinc-700">
-          <span>QR</span>
-          <span className="truncate">{resolved}</span>
-        </div>
-      );
-    }
+    if (resolved) return <QrSvg text={resolved} />;
+    if (context) return <QrPlaceholder label="QR source is empty" />;
     return (
       <div className="flex h-full w-full items-center justify-center border border-zinc-300 bg-white text-[10px] text-zinc-400 dark:border-zinc-700">
         <FieldChip path={props.source.field.path} />
       </div>
     );
   }
-  const label = props.source === "upi" ? "QR: UPI" : "QR: URL";
-  return (
-    <div className="flex h-full w-full items-center justify-center border border-zinc-300 bg-white text-[10px] text-zinc-400 dark:border-zinc-700">
-      {label}
-    </div>
-  );
+  if (props.source === "upi") {
+    if (!context) return <QrPlaceholder label="QR: UPI" />;
+    const uri = buildUpiUri(context);
+    return uri ? <QrSvg text={uri} /> : <QrPlaceholder label="UPI not configured" />;
+  }
+  // "customUrl" has no companion URL field in the current template schema
+  // (a pre-existing builder gap, not introduced here) — nothing to encode
+  // either in design mode or with real invoice data.
+  return <QrPlaceholder label="Custom URL not configured" />;
 }
 
 function ImageView({ props, context }: { props: ImageProps; context?: RenderContext }) {
@@ -210,14 +275,220 @@ function ImageView({ props, context }: { props: ImageProps; context?: RenderCont
   return <StructuralPlaceholder label="Image" />;
 }
 
+function LogoView({ context }: { context?: RenderContext }) {
+  const src = field("business.logo", context);
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element -- content is a user-provided/resolved arbitrary URL, not a local static asset
+    return <img src={src} alt="" className="h-full w-full object-contain" />;
+  }
+  return <StructuralPlaceholder label="Logo" />;
+}
+
+function HeaderView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.header} />;
+  return (
+    <div className="flex h-full w-full flex-col justify-center">
+      <div className="text-base font-bold">{field("business.name", context)}</div>
+      <div className="text-xs uppercase tracking-widest text-zinc-500">Tax Invoice</div>
+    </div>
+  );
+}
+
+// Right-aligned label/value row shared by the Invoice Details, Tax Summary,
+// Totals, and Payment Details blocks below. Renders nothing when the value
+// is absent, so a block only shows the rows it actually has data for.
+function DetailRow({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-zinc-500">{label}</span>
+      <span className="text-right">{value}</span>
+    </div>
+  );
+}
+
+function BusinessDetailsView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.businessDetails} />;
+  const name = field("business.name", context);
+  const address = field("business.address", context);
+  const gstin = field("business.gstin", context);
+  const phone = field("business.phone", context);
+  const email = field("business.email", context);
+  const website = field("business.website", context);
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      {name && <div className="font-semibold">{name}</div>}
+      {address && <div>{address}</div>}
+      {gstin && <div>GSTIN: {gstin}</div>}
+      {phone && <div>Phone: {phone}</div>}
+      {email && <div>Email: {email}</div>}
+      {website && <div>{website}</div>}
+    </div>
+  );
+}
+
+function CustomerDetailsView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.customerDetails} />;
+  const name = field("customer.name", context);
+  const company = field("customer.company", context);
+  const address = field("customer.address", context);
+  const shipping = field("customer.shipping_address", context);
+  const gstin = field("customer.gstin", context);
+  const phone = field("customer.phone", context);
+  const email = field("customer.email", context);
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <div className="text-[10px] uppercase tracking-wide text-zinc-500">Bill To</div>
+      {name && <div className="font-semibold">{name}</div>}
+      {company && <div>{company}</div>}
+      {address && <div>{address}</div>}
+      {gstin && <div>GSTIN: {gstin}</div>}
+      {phone && <div>Phone: {phone}</div>}
+      {email && <div>Email: {email}</div>}
+      {shipping && shipping !== address && (
+        <>
+          <div className="mt-1 text-[10px] uppercase tracking-wide text-zinc-500">Ship To</div>
+          <div>{shipping}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function InvoiceDetailsView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.invoiceDetails} />;
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <DetailRow label="Invoice #" value={field("invoice.number", context)} />
+      <DetailRow label="Date" value={field("invoice.date", context)} />
+      <DetailRow label="Due Date" value={field("invoice.due_date", context)} />
+      <DetailRow label="Status" value={field("invoice.status", context)} />
+    </div>
+  );
+}
+
+function TaxSummaryView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.taxSummary} />;
+  const isInterState = Number(context.totals.igst ?? "0") > 0;
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <DetailRow label="Taxable Amount" value={field("totals.taxable_amount", context)} />
+      {isInterState ? (
+        <DetailRow label="IGST" value={field("totals.igst", context)} />
+      ) : (
+        <>
+          <DetailRow label="CGST" value={field("totals.cgst", context)} />
+          <DetailRow label="SGST" value={field("totals.sgst", context)} />
+        </>
+      )}
+      <DetailRow label="Tax Total" value={field("totals.tax_total", context)} />
+    </div>
+  );
+}
+
+function TotalsView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.totals} />;
+  const isInterState = Number(context.totals.igst ?? "0") > 0;
+  const hasDiscount = Number(context.totals.discount ?? "0") > 0;
+  const hasRoundOff = Number(context.totals.round_off ?? "0") !== 0;
+  const hasPaid = Number(context.totals.paid ?? "0") > 0;
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <DetailRow label="Subtotal" value={field("totals.subtotal", context)} />
+      {hasDiscount && <DetailRow label="Discount" value={field("totals.discount", context)} />}
+      {isInterState ? (
+        <DetailRow label="IGST" value={field("totals.igst", context)} />
+      ) : (
+        <>
+          <DetailRow label="CGST" value={field("totals.cgst", context)} />
+          <DetailRow label="SGST" value={field("totals.sgst", context)} />
+        </>
+      )}
+      {hasRoundOff && <DetailRow label="Round Off" value={field("totals.round_off", context)} />}
+      <div className="mt-1 flex justify-between gap-2 border-t border-zinc-300 pt-1 font-semibold dark:border-zinc-700">
+        <span>Grand Total</span>
+        <span>{field("totals.grand_total", context)}</span>
+      </div>
+      {hasPaid && (
+        <>
+          <DetailRow label="Paid" value={field("totals.paid", context)} />
+          <DetailRow label="Balance Due" value={field("totals.balance", context)} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function PaymentDetailsView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.paymentDetails} />;
+  const bankName = field("payment.bank_name", context);
+  const account = field("payment.account_number", context);
+  const ifsc = field("payment.ifsc", context);
+  const upi = field("payment.upi", context);
+  if (!bankName && !account && !ifsc && !upi) {
+    return <StructuralPlaceholder label={STRUCTURAL_LABELS.paymentDetails} />;
+  }
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <DetailRow label="Bank" value={bankName} />
+      <DetailRow label="Account #" value={account} />
+      <DetailRow label="IFSC" value={ifsc} />
+      <DetailRow label="UPI" value={upi} />
+    </div>
+  );
+}
+
+function SignatureView() {
+  return (
+    <div className="flex h-full w-full flex-col items-end justify-end text-xs">
+      <div className="w-32 border-t border-zinc-400 pt-1 text-center text-zinc-600 dark:border-zinc-600 dark:text-zinc-400">
+        Authorized Signatory
+      </div>
+    </div>
+  );
+}
+
+function TermsView({ context }: { context?: RenderContext }) {
+  const terms = context?.terms;
+  if (!terms) return <StructuralPlaceholder label={STRUCTURAL_LABELS.terms} />;
+  return (
+    <div className="flex h-full w-full flex-col gap-1 text-xs leading-snug">
+      <div className="font-semibold">Terms &amp; Conditions</div>
+      <div className="whitespace-pre-wrap">{terms}</div>
+    </div>
+  );
+}
+
+function NotesView({ context }: { context?: RenderContext }) {
+  const notes = context?.notes;
+  if (!notes) return <StructuralPlaceholder label={STRUCTURAL_LABELS.notes} />;
+  return (
+    <div className="flex h-full w-full flex-col gap-1 text-xs leading-snug">
+      <div className="font-semibold">Notes</div>
+      <div className="whitespace-pre-wrap">{notes}</div>
+    </div>
+  );
+}
+
+function FooterView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.footer} />;
+  return (
+    <div className="flex h-full w-full items-center justify-center text-center text-[10px] text-zinc-400">
+      This is a computer-generated invoice and does not require a physical signature.
+    </div>
+  );
+}
+
 export function ComponentContent({
   component,
   context,
   itemsTablePreviewRowCount,
+  itemsTableShowHeader,
 }: {
   component: ComponentNode;
   context?: RenderContext;
   itemsTablePreviewRowCount?: number;
+  itemsTableShowHeader?: boolean;
 }) {
   // ComponentNode.props is a plain ComponentProps union, not discriminated
   // against `type` at the TS level (the Zod schema is; mirroring that in the
@@ -230,7 +501,7 @@ export function ComponentContent({
     case "image":
       return <ImageView props={component.props as ImageProps} context={context} />;
     case "logo":
-      return <StructuralPlaceholder label="Logo" />;
+      return <LogoView context={context} />;
     case "divider": {
       const props = component.props as DividerProps;
       return <div className="w-full" style={{ height: props.thickness ?? 1, background: props.color ?? "#d4d4d8" }} />;
@@ -245,8 +516,31 @@ export function ComponentContent({
           props={component.props as ItemsTableProps}
           items={context?.items}
           previewRowCount={itemsTablePreviewRowCount}
+          showHeader={itemsTableShowHeader}
         />
       );
+    case "header":
+      return <HeaderView context={context} />;
+    case "businessDetails":
+      return <BusinessDetailsView context={context} />;
+    case "customerDetails":
+      return <CustomerDetailsView context={context} />;
+    case "invoiceDetails":
+      return <InvoiceDetailsView context={context} />;
+    case "taxSummary":
+      return <TaxSummaryView context={context} />;
+    case "totals":
+      return <TotalsView context={context} />;
+    case "paymentDetails":
+      return <PaymentDetailsView context={context} />;
+    case "signature":
+      return <SignatureView />;
+    case "terms":
+      return <TermsView context={context} />;
+    case "notes":
+      return <NotesView context={context} />;
+    case "footer":
+      return <FooterView context={context} />;
     default:
       return <StructuralPlaceholder label={STRUCTURAL_LABELS[component.type] ?? component.type} />;
   }

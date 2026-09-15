@@ -32,6 +32,12 @@ export type RenderContext = {
     >
   >;
   payment: Partial<Record<"bank_name" | "account_number" | "ifsc" | "upi", string>>;
+  // Free-form per-invoice text (Phase 9's Invoice.notes/terms). Not part of
+  // the FieldRef-resolvable buckets above — these are shown as whole blocks
+  // by the dedicated "notes"/"terms" structural component types (Phase 12),
+  // not composed via text+FieldRef like the other categories.
+  notes?: string;
+  terms?: string;
   // Real invoice line items (Phase 9). Not part of the field-path registry —
   // ItemsTableView (components.tsx) reads this directly to render actual
   // rows instead of the design-mode dummy preview, keyed the same as

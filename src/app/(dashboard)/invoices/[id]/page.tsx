@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import { getInvoice } from "@/lib/services/invoices";
-import { getLatestVersion } from "@/lib/services/templates";
 import { listTemplates } from "@/lib/services/templates";
 import { listCustomers } from "@/lib/services/customers";
 import { listProducts } from "@/lib/services/products";
 import { getCompanySettings } from "@/lib/services/companySettings";
-import { buildRenderContext } from "@/lib/render/buildRenderContext";
+import { resolveInvoiceRenderData } from "@/lib/render/resolveInvoiceRender";
 import { InvoiceForm } from "@/components/invoices/InvoiceForm";
 import { InvoiceActions } from "@/components/invoices/InvoiceActions";
 import { InvoicePreviewPane } from "@/components/invoices/InvoicePreviewPane";
@@ -15,7 +14,6 @@ import { PaymentLinkForm } from "@/components/invoices/PaymentLinkForm";
 import { PaymentLinkList } from "@/components/invoices/PaymentLinkList";
 import { listPayments } from "@/lib/services/payments";
 import { listPaymentLinks } from "@/lib/services/paymentLinks";
-import type { TemplateDocument } from "@/types/template";
 
 export default async function InvoiceDetailPage({
   params,
@@ -77,47 +75,14 @@ export default async function InvoiceDetailPage({
 
   // ISSUED or CANCELLED — read-only view, rendered from the pinned template
   // version (issued invoices never re-render from a template's current,
-  // possibly-since-edited state).
-  const [company, payments, paymentLinks] = await Promise.all([
-    getCompanySettings(),
+  // possibly-since-edited state). Shares its data assembly with the Phase 12
+  // internal PDF render route via resolveInvoiceRenderData.
+  const [renderData, payments, paymentLinks] = await Promise.all([
+    resolveInvoiceRenderData(invoice.id),
     listPayments({ invoiceId: invoice.id }),
     listPaymentLinks({ invoiceId: invoice.id }),
   ]);
-  const version = invoice.templateVersion ?? (await getLatestVersion(invoice.templateId));
-  const layout = (version?.layout as unknown as TemplateDocument) ?? null;
-
-  const context = buildRenderContext({
-    company,
-    customer: invoice.customer,
-    invoice: {
-      invoiceNumber: invoice.invoiceNumber,
-      issueDateIso: invoice.issueDate?.toISOString() ?? null,
-      dueDateIso: invoice.dueDate?.toISOString() ?? null,
-      status: invoice.status,
-      subtotal: invoice.subtotal.toString(),
-      discountTotal: invoice.discountTotal.toString(),
-      taxableAmount: invoice.taxableAmount.toString(),
-      cgstTotal: invoice.cgstTotal.toString(),
-      sgstTotal: invoice.sgstTotal.toString(),
-      igstTotal: invoice.igstTotal.toString(),
-      taxTotal: invoice.taxTotal.toString(),
-      roundOff: invoice.roundOff.toString(),
-      grandTotal: invoice.grandTotal.toString(),
-      paidTotal: invoice.paidTotal.toString(),
-      balanceDue: invoice.balanceDue.toString(),
-    },
-    items: invoice.items.map((item) => ({
-      description: item.description,
-      hsnSac: item.hsnSac,
-      quantity: item.quantity.toString(),
-      unit: item.unit,
-      rate: item.rate.toString(),
-      discount: item.discount.toString(),
-      gstRate: item.gstRate.toString(),
-      taxAmount: item.taxAmount.toString(),
-      lineTotal: item.lineTotal.toString(),
-    })),
-  });
+  const { layout, context } = renderData!;
 
   return (
     <div>

@@ -50,6 +50,7 @@ export function TemplateRenderer({
   document,
   context,
   itemsTablePreviewRowCount,
+  itemsTableShowHeader,
   Wrapper = DefaultWrapper,
 }: {
   document: TemplateDocument;
@@ -61,6 +62,10 @@ export function TemplateRenderer({
   // list (Phase 7) before real invoice items exist (Phase 9). Not part of
   // the saved template JSON.
   itemsTablePreviewRowCount?: number;
+  // Multi-page-only knob (Phase 12's paginateDocument/MultiPageRenderer) —
+  // whether this page's itemsTable renders its <thead>. Omit for normal
+  // single-page rendering (builder canvas, non-paginated preview).
+  itemsTableShowHeader?: boolean;
   Wrapper?: ComponentType<ComponentWrapperProps>;
 }) {
   const { page, components } = document;
@@ -93,7 +98,12 @@ export function TemplateRenderer({
           };
           return (
             <Wrapper key={c.id} component={c} style={style}>
-              <ComponentContent component={c} context={context} itemsTablePreviewRowCount={itemsTablePreviewRowCount} />
+              <ComponentContent
+                component={c}
+                context={context}
+                itemsTablePreviewRowCount={itemsTablePreviewRowCount}
+                itemsTableShowHeader={itemsTableShowHeader}
+              />
             </Wrapper>
           );
         })}

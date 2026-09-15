@@ -80,6 +80,12 @@ export function InvoiceActions({ invoiceId, status }: { invoiceId: string; statu
             Cancel Invoice
           </button>
         )}
+        <a
+          href={`/api/v1/invoices/${invoiceId}/pdf`}
+          className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700"
+        >
+          Download PDF
+        </a>
         <button
           type="button"
           onClick={duplicate}

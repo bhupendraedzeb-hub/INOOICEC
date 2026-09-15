@@ -54,6 +54,8 @@ type InvoiceForContext = {
   grandTotal: string;
   paidTotal: string;
   balanceDue: string;
+  notes: string | null;
+  terms: string | null;
 };
 
 export type ItemForContext = {
@@ -123,6 +125,8 @@ export function buildRenderContext(opts: {
       ifsc: company.bankIfsc ?? undefined,
       upi: company.upiId ?? undefined,
     },
+    notes: invoice.notes ?? undefined,
+    terms: invoice.terms ?? undefined,
     items: items?.map((item, i) => ({
       index: String(i + 1),
       item: item.description,

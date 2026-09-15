@@ -135,6 +135,8 @@ export function InvoiceForm({
       grandTotal: toMoneyString(calc.grandTotal),
       paidTotal: "0.00",
       balanceDue: toMoneyString(calc.grandTotal),
+      notes: notes || null,
+      terms: terms || null,
     },
     // calc.lines is produced by mapping over `items` 1:1 (see calc above), so
     // calc.lines[i] always exists here.
