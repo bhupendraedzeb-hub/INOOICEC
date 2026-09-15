@@ -14,12 +14,29 @@ const invoiceInclude = {
   createdBy: { select: { id: true, name: true, email: true } },
 } satisfies Prisma.InvoiceInclude;
 
+// The OVERDUE transition is time-dependent and has no write-time trigger of
+// its own (derivePaymentStatus only runs on a Payment write or at /issue) —
+// an invoice can cross its due date with no new event to recompute it. This
+// bulk sync is the documented (Phase 9/10 notes) fix: run on every read that
+// lists/aggregates invoices, so the stored column — used for both display
+// and the Overdue filter — never lags. One-directional and idempotent: PAID
+// invoices are untouched (PAID overrides OVERDUE), and dueDate is immutable
+// once issued, so nothing ever needs to flip back out of OVERDUE.
+export async function syncOverdueInvoices() {
+  await db.invoice.updateMany({
+    where: { status: "ISSUED", paymentStatus: { in: ["UNPAID", "PARTIALLY_PAID"] }, dueDate: { lt: new Date() } },
+    data: { paymentStatus: "OVERDUE" },
+  });
+}
+
 export async function listInvoices(opts: {
   q?: string;
   status?: InvoiceStatus;
   paymentStatus?: PaymentStatus;
   customerId?: string;
+  limit?: number;
 }) {
+  await syncOverdueInvoices();
   return db.invoice.findMany({
     where: {
       ...(opts.status ? { status: opts.status } : {}),
@@ -36,6 +53,7 @@ export async function listInvoices(opts: {
     },
     include: { customer: true },
     orderBy: { createdAt: "desc" },
+    ...(opts.limit ? { take: opts.limit } : {}),
   });
 }
 
