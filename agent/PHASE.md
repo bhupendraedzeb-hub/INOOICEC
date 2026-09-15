@@ -802,7 +802,7 @@ Invoice events can reliably reach connected internal systems.
 
 ---
 
-# Phase 16 — Security & Audit
+# Phase 16 — Security & Audit ✅ Done
 
 ## Objective
 Make the application safe for internal production use.
