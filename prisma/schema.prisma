@@ -37,15 +37,16 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  accounts            Account[]
-  sessions            Session[]
-  auditLogs           AuditLog[]
-  apiKeys             ApiKey[]
-  createdTemplates    Template[]        @relation("TemplateCreatedBy")
-  createdVersions     TemplateVersion[] @relation("TemplateVersionCreatedBy")
-  createdInvoices     Invoice[]         @relation("InvoiceCreatedBy")
-  recordedPayments    Payment[]
-  createdPaymentLinks PaymentLink[]
+  accounts                Account[]
+  sessions                Session[]
+  auditLogs               AuditLog[]
+  apiKeys                 ApiKey[]
+  createdTemplates        Template[]        @relation("TemplateCreatedBy")
+  createdVersions         TemplateVersion[] @relation("TemplateVersionCreatedBy")
+  createdInvoices         Invoice[]         @relation("InvoiceCreatedBy")
+  recordedPayments        Payment[]
+  createdPaymentLinks     PaymentLink[]
+  createdWebhookEndpoints WebhookEndpoint[]
 }
 
 // NextAuth.js (Auth.js) v5 required models — Prisma adapter, database sessions.
@@ -393,6 +394,10 @@ model Payment {
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
+  // Added in Phase 15 for lib/webhooks/dispatch.ts's idempotency key
+  // (payment.updated needs a version that actually changes between two
+  // edits of the same payment — createdAt alone would collide).
+  updatedAt   DateTime @updatedAt
 
   @@index([invoiceId])
 }
@@ -437,4 +442,71 @@ model PaymentLink {
   payments Payment[]
 
   @@index([invoiceId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 15 — Webhooks & Integrations
+// ---------------------------------------------------------------------------
+
+model WebhookEndpoint {
+  id       String   @id @default(cuid())
+  url      String
+  label    String?
+  // Subset of lib/webhooks/events.ts's WEBHOOK_EVENTS — an endpoint only
+  // ever receives deliveries for events it's subscribed to.
+  events   String[]
+  isActive Boolean  @default(true)
+
+  // Generated at creation, shown once (same UX as ApiKey's plaintext
+  // secret) — HMAC-SHA256 signs every delivery to this endpoint. Falls
+  // back to WEBHOOK_DEFAULT_SIGNING_SECRET if somehow unset (see
+  // lib/webhooks/signature.ts), but the create flow always populates it.
+  signingSecret String?
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXHAUSTED
+}
+
+model WebhookDelivery {
+  id         String          @id @default(cuid())
+  endpointId String
+  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id])
+
+  event   String // e.g. "invoice.issued"
+  payload Json
+
+  // Derived from (endpointId, event, entityId, the triggering write's
+  // updatedAt) by lib/webhooks/dispatch.ts — the DB-constraint-backed
+  // idempotency guarantee that the same state change is never enqueued
+  // twice for the same endpoint, the same pattern Phase 11's
+  // Payment.gatewayTransactionId uses for inbound idempotency.
+  idempotencyKey String @unique
+
+  status        WebhookDeliveryStatus @default(PENDING)
+  attempts      Int                   @default(0)
+  lastAttemptAt DateTime?
+  // When the worker (lib/webhooks/worker.ts) should next try a
+  // PENDING/FAILED delivery — null means "due now".
+  nextAttemptAt DateTime?
+
+  responseStatus Int?
+  responseBody   String? // truncated
+  error          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([endpointId])
+  @@index([status, nextAttemptAt])
 }

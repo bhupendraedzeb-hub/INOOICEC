@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { Money, toMoneyString, sumMoney } from "@/lib/calc/money";
 import { derivePaymentStatus } from "@/lib/calc/gstEngine";
+import { enqueueWebhookEvent } from "@/lib/webhooks/dispatch";
 import type { PaymentMethod, Prisma } from "@/generated/prisma/client";
 import type { CreatePaymentInput, UpdatePaymentInput } from "@/lib/validation/schemas/payment";
 
@@ -12,7 +13,11 @@ export class OverpaymentError extends Error {}
 // Recomputes Invoice.paidTotal/balanceDue/paymentStatus from the current set
 // of non-voided Payment rows — the single source of truth, never
 // hand-editable. Must run in the same transaction as the payment write that
-// triggered it.
+// triggered it. `justCompleted` tells the caller whether this call is the
+// one that pushed the invoice's paymentStatus into PAID for the first time
+// (vs. it already being PAID, or landing somewhere else) — that's the
+// signal for firing the Phase 15 "payment.completed" event exactly once per
+// transition, not on every write while already paid.
 export async function recomputeInvoicePaymentState(tx: Prisma.TransactionClient, invoiceId: string) {
   const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
   const activePayments = await tx.payment.findMany({ where: { invoiceId, isVoided: false } });
@@ -21,13 +26,27 @@ export async function recomputeInvoicePaymentState(tx: Prisma.TransactionClient,
   const balanceDue = grandTotal.minus(paidTotal);
   const paymentStatus = derivePaymentStatus(grandTotal, paidTotal, invoice.dueDate, new Date());
 
-  return tx.invoice.update({
+  const updated = await tx.invoice.update({
     where: { id: invoiceId },
     data: {
       paidTotal: toMoneyString(paidTotal),
       balanceDue: toMoneyString(balanceDue),
       paymentStatus,
     },
+  });
+
+  return { invoice: updated, justCompleted: invoice.paymentStatus !== "PAID" && paymentStatus === "PAID" };
+}
+
+async function enqueuePaymentCompletedIfJust(
+  justCompleted: boolean,
+  invoice: { id: string; updatedAt: Date; invoiceNumber: string | null; grandTotal: { toString(): string }; paidTotal: { toString(): string } },
+) {
+  if (!justCompleted) return;
+  await enqueueWebhookEvent("payment.completed", "Invoice", invoice.id, invoice.updatedAt.toISOString(), {
+    invoiceNumber: invoice.invoiceNumber,
+    grandTotal: invoice.grandTotal.toString(),
+    paidTotal: invoice.paidTotal.toString(),
   });
 }
 
@@ -43,7 +62,7 @@ export async function getPayment(id: string) {
 }
 
 export async function createPayment(input: CreatePaymentInput, actorId: string) {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: input.invoiceId } });
     const activePayments = await tx.payment.findMany({
       where: { invoiceId: input.invoiceId, isVoided: false },
@@ -65,13 +84,21 @@ export async function createPayment(input: CreatePaymentInput, actorId: string) 
         createdById: actorId,
       },
     });
-    await recomputeInvoicePaymentState(tx, input.invoiceId);
-    return payment;
+    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, input.invoiceId);
+    return { payment, updatedInvoice, justCompleted };
   });
+
+  await enqueueWebhookEvent("payment.created", "Payment", result.payment.id, result.payment.createdAt.toISOString(), {
+    invoiceId: result.payment.invoiceId,
+    amount: result.payment.amount.toString(),
+    method: result.payment.method,
+  });
+  await enqueuePaymentCompletedIfJust(result.justCompleted, result.updatedInvoice);
+  return result.payment;
 }
 
 export async function updatePayment(id: string, input: UpdatePaymentInput) {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const existing = await tx.payment.findUniqueOrThrow({ where: { id } });
     const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: existing.invoiceId } });
     const otherActivePayments = await tx.payment.findMany({
@@ -93,20 +120,36 @@ export async function updatePayment(id: string, input: UpdatePaymentInput) {
         notes: input.notes || null,
       },
     });
-    await recomputeInvoicePaymentState(tx, existing.invoiceId);
-    return payment;
+    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, existing.invoiceId);
+    return { payment, updatedInvoice, justCompleted };
   });
+
+  await enqueueWebhookEvent("payment.updated", "Payment", result.payment.id, result.payment.updatedAt.toISOString(), {
+    invoiceId: result.payment.invoiceId,
+    amount: result.payment.amount.toString(),
+    method: result.payment.method,
+  });
+  await enqueuePaymentCompletedIfJust(result.justCompleted, result.updatedInvoice);
+  return result.payment;
 }
 
 // Voided, never deleted — a financial record (plan.md).
 export async function voidPayment(id: string, reason: string) {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     const existing = await tx.payment.findUniqueOrThrow({ where: { id } });
     const payment = await tx.payment.update({
       where: { id },
       data: { isVoided: true, voidedAt: new Date(), voidedReason: reason },
     });
-    await recomputeInvoicePaymentState(tx, existing.invoiceId);
-    return payment;
+    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, existing.invoiceId);
+    return { payment, updatedInvoice, justCompleted };
   });
+
+  await enqueueWebhookEvent("payment.updated", "Payment", result.payment.id, result.payment.updatedAt.toISOString(), {
+    invoiceId: result.payment.invoiceId,
+    amount: result.payment.amount.toString(),
+    voided: true,
+  });
+  await enqueuePaymentCompletedIfJust(result.justCompleted, result.updatedInvoice);
+  return result.payment;
 }

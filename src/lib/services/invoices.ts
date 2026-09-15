@@ -3,8 +3,31 @@ import { calculateInvoiceTotals, derivePaymentStatus } from "@/lib/calc/gstEngin
 import { toMoneyString, Money } from "@/lib/calc/money";
 import { reserveInvoiceNumber } from "@/lib/numbering/invoiceNumber";
 import { getCompanySettings } from "@/lib/services/companySettings";
+import { enqueueWebhookEvent } from "@/lib/webhooks/dispatch";
 import type { InvoiceInput } from "@/lib/validation/schemas/invoice";
 import type { InvoiceStatus, PaymentStatus, Prisma } from "@/generated/prisma/client";
+
+// Structural, not the full Invoice type — every function below returns a
+// differently-shaped Prisma result (customer-only include vs. full
+// invoiceInclude), so this only asks for the fields the webhook payload
+// actually needs.
+type InvoiceForWebhook = {
+  id: string;
+  updatedAt: Date;
+  invoiceNumber: string | null;
+  customerId: string;
+  status: string;
+  grandTotal: { toString(): string };
+};
+
+function invoiceWebhookData(invoice: InvoiceForWebhook) {
+  return {
+    invoiceNumber: invoice.invoiceNumber,
+    customerId: invoice.customerId,
+    status: invoice.status,
+    grandTotal: invoice.grandTotal.toString(),
+  };
+}
 
 const invoiceInclude = {
   items: { orderBy: { position: "asc" as const } },
@@ -103,7 +126,7 @@ export async function createInvoiceDraft(input: InvoiceInput, actorId: string) {
   const { calc, company } = await computeInvoiceCalc(input, input.customerId);
   const dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
-  return db.invoice.create({
+  const invoice = await db.invoice.create({
     data: {
       templateId: input.templateId,
       customerId: input.customerId,
@@ -126,6 +149,8 @@ export async function createInvoiceDraft(input: InvoiceInput, actorId: string) {
     },
     include: invoiceInclude,
   });
+  await enqueueWebhookEvent("invoice.created", "Invoice", invoice.id, invoice.updatedAt.toISOString(), invoiceWebhookData(invoice));
+  return invoice;
 }
 
 // Caller (the API route) is responsible for confirming the invoice is still
@@ -136,7 +161,7 @@ export async function updateInvoiceDraft(id: string, input: InvoiceInput) {
   const { calc } = await computeInvoiceCalc(input, input.customerId);
   const dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
-  return db.$transaction(async (tx) => {
+  const invoice = await db.$transaction(async (tx) => {
     await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
     return tx.invoice.update({
       where: { id },
@@ -161,13 +186,15 @@ export async function updateInvoiceDraft(id: string, input: InvoiceInput) {
       include: invoiceInclude,
     });
   });
+  await enqueueWebhookEvent("invoice.updated", "Invoice", invoice.id, invoice.updatedAt.toISOString(), invoiceWebhookData(invoice));
+  return invoice;
 }
 
 // The only place an invoice number is reserved and a TemplateVersion is
 // pinned — never on preview, never on create/update. Caller must have
 // already confirmed status === DRAFT.
 export async function issueInvoice(id: string) {
-  return db.$transaction(async (tx) => {
+  const invoice = await db.$transaction(async (tx) => {
     const invoice = await tx.invoice.findUniqueOrThrow({ where: { id } });
     const [company, latestVersion] = await Promise.all([
       getCompanySettings(),
@@ -207,23 +234,27 @@ export async function issueInvoice(id: string) {
       include: invoiceInclude,
     });
   });
+  await enqueueWebhookEvent("invoice.issued", "Invoice", invoice.id, invoice.updatedAt.toISOString(), invoiceWebhookData(invoice));
+  return invoice;
 }
 
 // Status flag only — never deletes rows (plan.md: financial records are
 // never silently destroyed).
 export async function cancelInvoice(id: string, reason: string) {
-  return db.invoice.update({
+  const invoice = await db.invoice.update({
     where: { id },
     data: { status: "CANCELLED", cancelledAt: new Date(), cancelledReason: reason },
     include: invoiceInclude,
   });
+  await enqueueWebhookEvent("invoice.cancelled", "Invoice", invoice.id, invoice.updatedAt.toISOString(), invoiceWebhookData(invoice));
+  return invoice;
 }
 
 export async function duplicateInvoice(id: string, actorId: string) {
   const source = await getInvoice(id);
   if (!source) return null;
 
-  return db.invoice.create({
+  const invoice = await db.invoice.create({
     data: {
       templateId: source.templateId,
       customerId: source.customerId,
@@ -260,6 +291,8 @@ export async function duplicateInvoice(id: string, actorId: string) {
     },
     include: invoiceInclude,
   });
+  await enqueueWebhookEvent("invoice.created", "Invoice", invoice.id, invoice.updatedAt.toISOString(), invoiceWebhookData(invoice));
+  return invoice;
 }
 
 // Only ever called by the route after confirming status === DRAFT — a real

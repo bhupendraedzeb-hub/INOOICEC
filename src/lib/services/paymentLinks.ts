@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { Money } from "@/lib/calc/money";
 import { Prisma, type PaymentLink } from "@/generated/prisma/client";
 import { recomputeInvoicePaymentState } from "@/lib/services/payments";
+import { enqueueWebhookEvent } from "@/lib/webhooks/dispatch";
 import type { CreatePaymentLinkInput, InboundWebhookInput } from "@/lib/validation/schemas/paymentLink";
 
 // The requested link amount exceeds the invoice's current balance due.
@@ -93,8 +94,9 @@ export async function recordWebhookPayment(input: InboundWebhookInput) {
     return null;
   }
 
+  let result;
   try {
-    return await db.$transaction(async (tx) => {
+    result = await db.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: link.invoiceId } });
       const activePayments = await tx.payment.findMany({ where: { invoiceId: link.invoiceId, isVoided: false } });
       const currentPaid = activePayments.reduce((acc, p) => acc.plus(new Money(p.amount.toString())), new Money(0));
@@ -117,13 +119,38 @@ export async function recordWebhookPayment(input: InboundWebhookInput) {
         where: { id: link.id },
         data: { status: "PAID", externalPaymentId: input.gatewayTransactionId, paidAt: new Date() },
       });
-      await recomputeInvoicePaymentState(tx, link.invoiceId);
-      return payment;
+      const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, link.invoiceId);
+      return { payment, updatedInvoice, justCompleted };
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      // Idempotent replay (the DB-level backstop) — the payment already
+      // exists from an earlier delivery of this same gateway transaction,
+      // so no new state change happened here; no webhook event to enqueue.
       return db.payment.findFirstOrThrow({ where: { gatewayTransactionId: input.gatewayTransactionId } });
     }
     throw err;
   }
+
+  await enqueueWebhookEvent(
+    "payment.created",
+    "Payment",
+    result.payment.id,
+    result.payment.createdAt.toISOString(),
+    { invoiceId: result.payment.invoiceId, amount: result.payment.amount.toString(), method: result.payment.method },
+  );
+  if (result.justCompleted) {
+    await enqueueWebhookEvent(
+      "payment.completed",
+      "Invoice",
+      result.updatedInvoice.id,
+      result.updatedInvoice.updatedAt.toISOString(),
+      {
+        invoiceNumber: result.updatedInvoice.invoiceNumber,
+        grandTotal: result.updatedInvoice.grandTotal.toString(),
+        paidTotal: result.updatedInvoice.paidTotal.toString(),
+      },
+    );
+  }
+  return result.payment;
 }
