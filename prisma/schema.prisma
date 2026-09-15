@@ -43,6 +43,7 @@ model User {
   apiKeys          ApiKey[]
   createdTemplates Template[]        @relation("TemplateCreatedBy")
   createdVersions  TemplateVersion[] @relation("TemplateVersionCreatedBy")
+  createdInvoices  Invoice[]         @relation("InvoiceCreatedBy")
 }
 
 // NextAuth.js (Auth.js) v5 required models — Prisma adapter, database sessions.
@@ -155,6 +156,8 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  invoices Invoice[]
+
   @@index([name])
 }
 
@@ -200,6 +203,7 @@ model Template {
 
   createdBy User              @relation("TemplateCreatedBy", fields: [createdById], references: [id])
   versions  TemplateVersion[]
+  invoices  Invoice[]
 
   @@index([status])
 }
@@ -218,8 +222,9 @@ model TemplateVersion {
   createdById String
   createdAt   DateTime @default(now())
 
-  template  Template @relation(fields: [templateId], references: [id])
-  createdBy User     @relation("TemplateVersionCreatedBy", fields: [createdById], references: [id])
+  template  Template  @relation(fields: [templateId], references: [id])
+  createdBy User      @relation("TemplateVersionCreatedBy", fields: [createdById], references: [id])
+  invoices  Invoice[]
 
   @@unique([templateId, versionNumber])
 }
@@ -236,4 +241,110 @@ model ApiKey {
   createdAt   DateTime  @default(now())
 
   createdBy User @relation(fields: [createdById], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 9 — Invoice Creation & Management
+// ---------------------------------------------------------------------------
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+// Atomic, gap-safe invoice number reservation — one row per (prefix,
+// financialYear). Incremented via Prisma upsert, which Postgres implements
+// as INSERT ... ON CONFLICT DO UPDATE, safe under concurrent /issue calls
+// without a separate SELECT ... FOR UPDATE.
+model InvoiceNumberCounter {
+  id            String @id @default(cuid())
+  prefix        String
+  financialYear String
+  lastSequence  Int    @default(0)
+
+  @@unique([prefix, financialYear])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String?       @unique // null while DRAFT; assigned only at /issue
+  status        InvoiceStatus @default(DRAFT)
+  // Cached/derived (lib/calc/gstEngine.ts's derivePaymentStatus), recomputed
+  // transactionally on every totals/payment write — never hand-editable, so
+  // a paid invoice can't silently flip via an unrelated UI change.
+  paymentStatus PaymentStatus @default(UNPAID)
+
+  templateId        String
+  template          Template         @relation(fields: [templateId], references: [id])
+  // Set only at /issue; immutable thereafter. PDFs for issued invoices (Phase
+  // 12) always render from this pinned version, never the template's current
+  // (possibly since-edited) state.
+  templateVersionId String?
+  templateVersion   TemplateVersion? @relation(fields: [templateVersionId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  issueDate DateTime?
+  dueDate   DateTime?
+
+  currency String @default("INR")
+
+  // Server-computed only (lib/calc/gstEngine.ts) — API layer must ignore any
+  // client-sent values for these fields.
+  subtotal      Decimal @default(0) @db.Decimal(14, 2)
+  discountTotal Decimal @default(0) @db.Decimal(14, 2)
+  taxableAmount Decimal @default(0) @db.Decimal(14, 2)
+  cgstTotal     Decimal @default(0) @db.Decimal(14, 2)
+  sgstTotal     Decimal @default(0) @db.Decimal(14, 2)
+  igstTotal     Decimal @default(0) @db.Decimal(14, 2)
+  taxTotal      Decimal @default(0) @db.Decimal(14, 2)
+  roundOff      Decimal @default(0) @db.Decimal(14, 2)
+  grandTotal    Decimal @default(0) @db.Decimal(14, 2)
+  // Cached sum of Payment.amount (Phase 10 adds real writes to these; both
+  // default to 0/grandTotal until then since no Payment model exists yet).
+  paidTotal     Decimal @default(0) @db.Decimal(14, 2)
+  balanceDue    Decimal @default(0) @db.Decimal(14, 2)
+
+  notes String?
+  terms String?
+
+  createdById     String
+  createdBy       User      @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  cancelledAt     DateTime?
+  cancelledReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items InvoiceItem[]
+
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([customerId])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  position    Int
+  productId   String?
+  description String
+  hsnSac      String?
+  quantity    Decimal @db.Decimal(14, 3)
+  unit        String?
+  rate        Decimal @db.Decimal(14, 2)
+  discount    Decimal @default(0) @db.Decimal(14, 2) // per-line discount amount
+  gstRate     Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(14, 2) // server-computed
+  lineTotal   Decimal @default(0) @db.Decimal(14, 2) // server-computed
 }

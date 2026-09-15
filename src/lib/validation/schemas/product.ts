@@ -1,11 +1,5 @@
 import { z } from "zod";
-
-// Money/rate fields are strings across the API boundary (never JS numbers) —
-// see plan.md's "Decimal boundary risk": avoids float coercion, parsed into
-// Prisma.Decimal in the service layer.
-const decimalString = z
-  .string()
-  .regex(/^\d+(\.\d{1,4})?$/, "Must be a plain decimal number, e.g. 1234.50");
+import { decimalString } from "@/lib/validation/decimal";
 
 export const productSchema = z.object({
   name: z.string().min(1, "Name is required"),

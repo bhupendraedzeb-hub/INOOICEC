@@ -68,9 +68,24 @@ function itemsTableSampleValue(key: string, rowIndex: number): string {
 // previewRowCount is a builder-only rendering knob (not part of the saved
 // template JSON) — it exists so the multi-row/wrapping/print-readiness
 // behavior can be verified against a long dummy list before real invoice
-// data exists (Phase 9) or the PDF pipeline exists (Phase 12), which is the
-// only place actual page-break pagination can be verified for real.
-function ItemsTableView({ props, previewRowCount = DEFAULT_SAMPLE_ROWS }: { props: ItemsTableProps; previewRowCount?: number }) {
+// data exists. `items`, when supplied via RenderContext (Phase 9+), are the
+// invoice's actual line items and always take priority over the dummy
+// preview rows — a real invoice must never show placeholder "Sample Item"
+// rows.
+function ItemsTableView({
+  props,
+  items,
+  previewRowCount = DEFAULT_SAMPLE_ROWS,
+}: {
+  props: ItemsTableProps;
+  items?: RenderContext["items"];
+  previewRowCount?: number;
+}) {
+  const rows: Record<string, string>[] =
+    items ?? Array.from({ length: previewRowCount }, (_, i) => Object.fromEntries(
+      props.columns.map((col) => [col.key, itemsTableSampleValue(col.key, i)]),
+    ));
+
   return (
     <table className="h-full w-full border-collapse text-xs" style={{ tableLayout: "fixed" }}>
       <thead>
@@ -87,15 +102,22 @@ function ItemsTableView({ props, previewRowCount = DEFAULT_SAMPLE_ROWS }: { prop
         </tr>
       </thead>
       <tbody>
-        {Array.from({ length: previewRowCount }).map((_, i) => (
+        {rows.length === 0 && (
+          <tr>
+            <td colSpan={props.columns.length} className="border border-zinc-200 px-1 py-2 text-center text-zinc-400 dark:border-zinc-800">
+              No items
+            </td>
+          </tr>
+        )}
+        {rows.map((row, i) => (
           <tr key={i} style={{ breakInside: "avoid" }}>
             {props.columns.map((col) => (
               <td
                 key={col.key}
                 style={{ textAlign: col.align ?? "left", whiteSpace: "normal", wordBreak: "break-word" }}
-                className="border border-zinc-200 px-1 py-0.5 align-top text-zinc-400 dark:border-zinc-800"
+                className={`border border-zinc-200 px-1 py-0.5 align-top dark:border-zinc-800 ${items ? "" : "text-zinc-400"}`}
               >
-                {itemsTableSampleValue(col.key, i)}
+                {row[col.key] ?? ""}
               </td>
             ))}
           </tr>
@@ -218,7 +240,13 @@ export function ComponentContent({
     case "qrcode":
       return <QrCodeView props={component.props as QrCodeProps} context={context} />;
     case "itemsTable":
-      return <ItemsTableView props={component.props as ItemsTableProps} previewRowCount={itemsTablePreviewRowCount} />;
+      return (
+        <ItemsTableView
+          props={component.props as ItemsTableProps}
+          items={context?.items}
+          previewRowCount={itemsTablePreviewRowCount}
+        />
+      );
     default:
       return <StructuralPlaceholder label={STRUCTURAL_LABELS[component.type] ?? component.type} />;
   }

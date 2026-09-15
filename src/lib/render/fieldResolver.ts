@@ -32,6 +32,23 @@ export type RenderContext = {
     >
   >;
   payment: Partial<Record<"bank_name" | "account_number" | "ifsc" | "upi", string>>;
+  // Real invoice line items (Phase 9). Not part of the field-path registry —
+  // ItemsTableView (components.tsx) reads this directly to render actual
+  // rows instead of the design-mode dummy preview, keyed the same as
+  // ItemsTableColumnKey so column config maps straight across.
+  items?: Array<{
+    index: string;
+    item: string;
+    description: string;
+    hsn: string;
+    qty: string;
+    unit: string;
+    rate: string;
+    discount: string;
+    gstPercent: string;
+    taxAmount: string;
+    amount: string;
+  }>;
 };
 
 function rawValueAt(context: RenderContext, path: string): string | undefined {
