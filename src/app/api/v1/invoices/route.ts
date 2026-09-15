@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { withAuthedJson } from "@/lib/api/handler";
 import { invoiceInputSchema } from "@/lib/validation/schemas/invoice";
+import { parseEnumParam } from "@/lib/validation/enumParam";
 import { listInvoices, createInvoiceDraft } from "@/lib/services/invoices";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
-import type { InvoiceStatus, PaymentStatus } from "@/generated/prisma/client";
+
+const INVOICE_STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
+const PAYMENT_STATUSES = ["UNPAID", "PARTIALLY_PAID", "PAID", "OVERDUE"] as const;
 
 export const GET = withAuthedJson(
   null,
@@ -11,8 +14,8 @@ export const GET = withAuthedJson(
     const params = request.nextUrl.searchParams;
     const invoices = await listInvoices({
       q: params.get("q") ?? undefined,
-      status: (params.get("status") as InvoiceStatus) ?? undefined,
-      paymentStatus: (params.get("paymentStatus") as PaymentStatus) ?? undefined,
+      status: parseEnumParam(params.get("status"), INVOICE_STATUSES),
+      paymentStatus: parseEnumParam(params.get("paymentStatus"), PAYMENT_STATUSES),
       customerId: params.get("customerId") ?? undefined,
     });
     return NextResponse.json(invoices);

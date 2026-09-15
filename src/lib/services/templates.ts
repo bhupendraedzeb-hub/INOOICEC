@@ -1,12 +1,16 @@
 import { db } from "@/lib/db";
 import { DEFAULT_TEMPLATE_DOCUMENT, type TemplateDocument } from "@/types/template";
+import { parseEnumParam } from "@/lib/validation/enumParam";
 import type { TemplateMetadataInput } from "@/lib/validation/schemas/template";
 import type { Prisma } from "@/generated/prisma/client";
 
+const TEMPLATE_STATUSES = ["DRAFT", "ACTIVE", "ARCHIVED"] as const;
+
 export async function listTemplates(opts: { q?: string; status?: string }) {
+  const status = parseEnumParam(opts.status ?? null, TEMPLATE_STATUSES);
   return db.template.findMany({
     where: {
-      ...(opts.status ? { status: opts.status as "DRAFT" | "ACTIVE" | "ARCHIVED" } : {}),
+      ...(status ? { status } : {}),
       ...(opts.q ? { name: { contains: opts.q, mode: "insensitive" as const } } : {}),
     },
     orderBy: { updatedAt: "desc" },

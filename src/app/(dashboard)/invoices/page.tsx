@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { listInvoices } from "@/lib/services/invoices";
 import { Badge } from "@/components/invoices/StatusBadge";
-import type { InvoiceStatus, PaymentStatus } from "@/generated/prisma/client";
+import { parseEnumParam } from "@/lib/validation/enumParam";
+
+const INVOICE_STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
+const PAYMENT_STATUSES = ["UNPAID", "PARTIALLY_PAID", "PAID", "OVERDUE"] as const;
 
 export default async function InvoicesPage({
   searchParams,
@@ -11,8 +14,8 @@ export default async function InvoicesPage({
   const { q, status, paymentStatus } = await searchParams;
   const invoices = await listInvoices({
     q,
-    status: status as InvoiceStatus | undefined,
-    paymentStatus: paymentStatus as PaymentStatus | undefined,
+    status: parseEnumParam(status ?? null, INVOICE_STATUSES),
+    paymentStatus: parseEnumParam(paymentStatus ?? null, PAYMENT_STATUSES),
   });
 
   return (
