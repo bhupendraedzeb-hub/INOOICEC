@@ -8,8 +8,12 @@ import { resolveInvoiceRenderData } from "@/lib/render/resolveInvoiceRender";
 // the resolved RenderContext, for a client to feed into TemplateRenderer.
 // Shares its data assembly with the Phase 12 internal PDF render route via
 // resolveInvoiceRenderData.
-export const GET = withAuthedJson<undefined, { id: string }>(null, async ({ params }) => {
-  const data = await resolveInvoiceRenderData(params.id);
-  if (!data) throw new ApiError(404, "Invoice not found");
-  return NextResponse.json(data);
-});
+export const GET = withAuthedJson<undefined, { id: string }>(
+  null,
+  async ({ params }) => {
+    const data = await resolveInvoiceRenderData(params.id);
+    if (!data) throw new ApiError(404, "Invoice not found");
+    return NextResponse.json(data);
+  },
+  { scope: "invoices:read" },
+);

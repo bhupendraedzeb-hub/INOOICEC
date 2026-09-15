@@ -4,11 +4,15 @@ import { productSchema, type ProductInput } from "@/lib/validation/schemas/produ
 import { getProduct, updateProduct } from "@/lib/services/products";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
 
-export const GET = withAuthedJson<undefined, { id: string }>(null, async ({ params }) => {
-  const product = await getProduct(params.id);
-  if (!product) throw new ApiError(404, "Product not found");
-  return NextResponse.json(product);
-});
+export const GET = withAuthedJson<undefined, { id: string }>(
+  null,
+  async ({ params }) => {
+    const product = await getProduct(params.id);
+    if (!product) throw new ApiError(404, "Product not found");
+    return NextResponse.json(product);
+  },
+  { scope: "products:read" },
+);
 
 export const PUT = withAuthedJson<ProductInput, { id: string }>(
   productSchema,
@@ -24,4 +28,5 @@ export const PUT = withAuthedJson<ProductInput, { id: string }>(
     });
     return NextResponse.json(product);
   },
+  { scope: "products:write" },
 );

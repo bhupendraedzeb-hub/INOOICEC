@@ -4,10 +4,14 @@ import { companySettingsSchema } from "@/lib/validation/schemas/companySettings"
 import { getCompanySettings, updateCompanySettings } from "@/lib/services/companySettings";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
 
-export const GET = withAuthedJson(null, async () => {
-  const settings = await getCompanySettings();
-  return NextResponse.json(settings);
-});
+export const GET = withAuthedJson(
+  null,
+  async () => {
+    const settings = await getCompanySettings();
+    return NextResponse.json(settings);
+  },
+  { scope: "settings:read" },
+);
 
 export const PUT = withAuthedJson(
   companySettingsSchema,
@@ -21,5 +25,5 @@ export const PUT = withAuthedJson(
     });
     return NextResponse.json(settings);
   },
-  { roles: ["OWNER", "ADMIN"] },
+  { roles: ["OWNER", "ADMIN"], scope: "settings:write" },
 );

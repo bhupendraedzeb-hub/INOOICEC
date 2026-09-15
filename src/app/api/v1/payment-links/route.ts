@@ -5,11 +5,15 @@ import { listPaymentLinks, createPaymentLink, PaymentLinkAmountError } from "@/l
 import { getInvoice } from "@/lib/services/invoices";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
 
-export const GET = withAuthedJson(null, async ({ request }) => {
-  const invoiceId = request.nextUrl.searchParams.get("invoiceId") ?? undefined;
-  const links = await listPaymentLinks({ invoiceId });
-  return NextResponse.json(links);
-});
+export const GET = withAuthedJson(
+  null,
+  async ({ request }) => {
+    const invoiceId = request.nextUrl.searchParams.get("invoiceId") ?? undefined;
+    const links = await listPaymentLinks({ invoiceId });
+    return NextResponse.json(links);
+  },
+  { scope: "payment_links:read" },
+);
 
 export const POST = withAuthedJson(createPaymentLinkSchema, async ({ session, body }) => {
   const invoice = await getInvoice(body.invoiceId);
@@ -30,4 +34,4 @@ export const POST = withAuthedJson(createPaymentLinkSchema, async ({ session, bo
     if (err instanceof PaymentLinkAmountError) throw new ApiError(422, err.message);
     throw err;
   }
-});
+}, { scope: "payment_links:write" });

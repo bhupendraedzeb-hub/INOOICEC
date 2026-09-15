@@ -4,11 +4,15 @@ import { updatePaymentSchema, type UpdatePaymentInput } from "@/lib/validation/s
 import { getPayment, updatePayment, OverpaymentError } from "@/lib/services/payments";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
 
-export const GET = withAuthedJson<undefined, { id: string }>(null, async ({ params }) => {
-  const payment = await getPayment(params.id);
-  if (!payment) throw new ApiError(404, "Payment not found");
-  return NextResponse.json(payment);
-});
+export const GET = withAuthedJson<undefined, { id: string }>(
+  null,
+  async ({ params }) => {
+    const payment = await getPayment(params.id);
+    if (!payment) throw new ApiError(404, "Payment not found");
+    return NextResponse.json(payment);
+  },
+  { scope: "payments:read" },
+);
 
 export const PUT = withAuthedJson<UpdatePaymentInput, { id: string }>(
   updatePaymentSchema,
@@ -31,4 +35,5 @@ export const PUT = withAuthedJson<UpdatePaymentInput, { id: string }>(
       throw err;
     }
   },
+  { scope: "payments:write" },
 );

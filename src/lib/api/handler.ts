@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
-import { auth } from "@/lib/auth/auth";
+import { resolveRequestAuth } from "@/lib/auth/resolveRequestAuth";
 import { logger } from "@/lib/logger";
 import type { Session } from "next-auth";
 
@@ -22,16 +22,22 @@ type AuthedHandler<TBody, TParams> = (ctx: {
 }) => Promise<NextResponse>;
 
 type WithAuthedJsonOptions = {
-  // Restrict the route to specific roles (e.g. ["OWNER", "ADMIN"]). Omit to
-  // allow any authenticated user.
+  // Restrict the route to specific roles (e.g. ["OWNER", "ADMIN"]) — checked
+  // only for a session (browser) actor.
   roles?: string[];
+  // Restrict the route to a required scope (e.g. "invoices:write") — checked
+  // only for an API-key actor. A session actor is never scope-gated (its
+  // `roles` check above is the only gate that applies to it) and an
+  // API-key actor is never role-gated — one request is governed by exactly
+  // one of the two permission models, never both.
+  scope?: string;
 };
 
-// Phase 1 scope: session-auth only. The dual session+API-key resolver
-// (resolveRequestAuth) is introduced in Phase 14 once ApiKey issuance exists;
-// this wrapper is the shared error-handling/Zod pattern every /api/v1 route
-// will build on. TParams covers dynamic segments (e.g. { id: string } for
-// /api/v1/customers/[id]); routes with no dynamic segments can ignore it.
+// The shared error-handling/Zod/dual-auth pattern every /api/v1 route
+// builds on (lib/auth/resolveRequestAuth.ts: NextAuth session first, else
+// `Authorization: Bearer inv_live_...`). TParams covers dynamic segments
+// (e.g. { id: string } for /api/v1/customers/[id]); routes with no dynamic
+// segments can ignore it.
 export function withAuthedJson<TBody, TParams = Record<string, never>>(
   schema: ZodType<TBody> | null,
   handler: AuthedHandler<TBody, TParams>,
@@ -39,13 +45,17 @@ export function withAuthedJson<TBody, TParams = Record<string, never>>(
 ) {
   return async (request: NextRequest, context?: { params: Promise<TParams> }) => {
     try {
-      const session = await auth();
-      if (!session?.user) {
+      const resolved = await resolveRequestAuth(request);
+      if (!resolved) {
         throw new ApiError(401, "Unauthorized");
       }
-      if (options.roles && !options.roles.includes(session.user.role)) {
+      if (resolved.kind === "session" && options.roles && !options.roles.includes(resolved.session.user.role)) {
         throw new ApiError(403, "Forbidden");
       }
+      if (resolved.kind === "apiKey" && options.scope && !resolved.scopes.includes(options.scope)) {
+        throw new ApiError(403, `Forbidden — API key is missing required scope: ${options.scope}`);
+      }
+      const session = resolved.session;
 
       let body = undefined as TBody;
       if (schema) {

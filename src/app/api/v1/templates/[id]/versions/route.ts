@@ -4,10 +4,14 @@ import { createVersionSchema, type CreateVersionInput } from "@/lib/validation/s
 import { listVersions, createTemplateVersion, getTemplate } from "@/lib/services/templates";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
 
-export const GET = withAuthedJson<undefined, { id: string }>(null, async ({ params }) => {
-  const versions = await listVersions(params.id);
-  return NextResponse.json(versions);
-});
+export const GET = withAuthedJson<undefined, { id: string }>(
+  null,
+  async ({ params }) => {
+    const versions = await listVersions(params.id);
+    return NextResponse.json(versions);
+  },
+  { scope: "templates:read" },
+);
 
 // Always creates a new version row — see templates.ts: there is no update
 // path for an existing TemplateVersion. This is the enforcement point for
@@ -28,4 +32,5 @@ export const POST = withAuthedJson<CreateVersionInput, { id: string }>(
     });
     return NextResponse.json(version, { status: 201 });
   },
+  { scope: "templates:write" },
 );

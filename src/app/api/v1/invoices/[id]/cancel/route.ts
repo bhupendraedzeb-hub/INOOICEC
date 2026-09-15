@@ -21,4 +21,5 @@ export const POST = withAuthedJson<CancelInvoiceInput, { id: string }>(
     });
     return NextResponse.json(invoice);
   },
+  { scope: "invoices:write" },
 );

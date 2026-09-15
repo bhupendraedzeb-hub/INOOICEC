@@ -22,4 +22,5 @@ export const POST = withAuthedJson<VoidPaymentInput, { id: string }>(
     });
     return NextResponse.json(payment);
   },
+  { scope: "payments:write" },
 );
