@@ -566,7 +566,7 @@ Invoice payment state is always consistent with payment records.
 
 ---
 
-# Phase 11 — Payment Links
+# Phase 11 — Payment Links ✅ Done
 
 ## Objective
 Support payment collection through generated payment links.
