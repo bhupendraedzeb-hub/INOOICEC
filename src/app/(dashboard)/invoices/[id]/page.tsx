@@ -9,6 +9,9 @@ import { buildRenderContext } from "@/lib/render/buildRenderContext";
 import { InvoiceForm } from "@/components/invoices/InvoiceForm";
 import { InvoiceActions } from "@/components/invoices/InvoiceActions";
 import { InvoicePreviewPane } from "@/components/invoices/InvoicePreviewPane";
+import { PaymentForm } from "@/components/invoices/PaymentForm";
+import { PaymentTimeline } from "@/components/invoices/PaymentTimeline";
+import { listPayments } from "@/lib/services/payments";
 import type { TemplateDocument } from "@/types/template";
 
 export default async function InvoiceDetailPage({
@@ -72,7 +75,7 @@ export default async function InvoiceDetailPage({
   // ISSUED or CANCELLED — read-only view, rendered from the pinned template
   // version (issued invoices never re-render from a template's current,
   // possibly-since-edited state).
-  const company = await getCompanySettings();
+  const [company, payments] = await Promise.all([getCompanySettings(), listPayments({ invoiceId: invoice.id })]);
   const version = invoice.templateVersion ?? (await getLatestVersion(invoice.templateId));
   const layout = (version?.layout as unknown as TemplateDocument) ?? null;
 
@@ -125,7 +128,32 @@ export default async function InvoiceDetailPage({
         </div>
         <InvoiceActions invoiceId={invoice.id} status={invoice.status} />
       </div>
-      <InvoicePreviewPane layout={layout} context={context} />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <InvoicePreviewPane layout={layout} context={context} />
+        <div className="flex flex-col gap-4">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">Payments</h3>
+            <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+              Paid: {invoice.paidTotal.toString()} · Balance: {invoice.balanceDue.toString()}
+            </p>
+            <PaymentTimeline
+              payments={payments.map((p) => ({
+                id: p.id,
+                amount: p.amount.toString(),
+                paymentDate: p.paymentDate.toISOString(),
+                method: p.method,
+                transactionRef: p.transactionRef,
+                notes: p.notes,
+                isVoided: p.isVoided,
+                voidedReason: p.voidedReason,
+              }))}
+            />
+          </div>
+          {invoice.status === "ISSUED" && Number(invoice.balanceDue) > 0 && (
+            <PaymentForm invoiceId={invoice.id} balanceDue={invoice.balanceDue.toString()} />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -44,7 +44,7 @@ describe("resolveFieldRef", () => {
 
   it("formats a date field", () => {
     const resolved = resolveFieldRef({ kind: "field", path: "invoice.date" }, context);
-    expect(resolved).toBe(new Date("2026-09-14").toLocaleDateString());
+    expect(resolved).toBe(new Date("2026-09-14").toLocaleDateString("en-IN"));
   });
 
   it("uses the fallback when the value is missing", () => {

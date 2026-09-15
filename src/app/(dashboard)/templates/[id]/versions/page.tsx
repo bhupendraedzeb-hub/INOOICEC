@@ -38,7 +38,7 @@ export default async function TemplateVersionsPage({
               <tr key={v.id} className="border-b border-zinc-100 dark:border-zinc-900">
                 <td className="py-2 font-medium text-zinc-900 dark:text-zinc-50">v{v.versionNumber}</td>
                 <td className="py-2 text-zinc-600 dark:text-zinc-400">
-                  {new Date(v.createdAt).toLocaleString()}
+                  {new Date(v.createdAt).toLocaleString("en-IN")}
                 </td>
                 <td className="py-2 text-zinc-600 dark:text-zinc-400">
                   {Array.isArray(layout?.components) ? layout.components.length : 0}

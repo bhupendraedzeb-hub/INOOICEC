@@ -65,7 +65,11 @@ function formatByType(raw: string, type: "text" | "date" | "currency" | "image")
     }
     case "date": {
       const d = new Date(raw);
-      return Number.isNaN(d.getTime()) ? raw : d.toLocaleDateString();
+      // Explicit locale, not the ambient default — this can run inside a
+      // client-hydrated tree (the live invoice preview), where the server's
+      // and browser's default locale/ICU data can differ and produce a real
+      // hydration mismatch (the same class of bug Phase 5 hit with dnd-kit).
+      return Number.isNaN(d.getTime()) ? raw : d.toLocaleDateString("en-IN");
     }
     default:
       return raw;

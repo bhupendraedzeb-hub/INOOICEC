@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { calculateInvoiceTotals } from "@/lib/calc/gstEngine";
-import { toMoneyString } from "@/lib/calc/money";
+import { calculateInvoiceTotals, derivePaymentStatus } from "@/lib/calc/gstEngine";
+import { toMoneyString, Money } from "@/lib/calc/money";
 import { reserveInvoiceNumber } from "@/lib/numbering/invoiceNumber";
 import { getCompanySettings } from "@/lib/services/companySettings";
 import type { InvoiceInput } from "@/lib/validation/schemas/invoice";
@@ -166,6 +166,17 @@ export async function issueInvoice(id: string) {
       issueDate,
     });
 
+    // No payments can exist against a DRAFT invoice (Payments API only
+    // accepts ISSUED ones), so paidTotal is always 0 here — derive whether
+    // it's immediately OVERDUE (a backdated due date) rather than leaving it
+    // at the UNPAID default until Phase 10's payment writes first touch it.
+    const paymentStatus = derivePaymentStatus(
+      new Money(invoice.grandTotal.toString()),
+      new Money(0),
+      invoice.dueDate,
+      issueDate,
+    );
+
     return tx.invoice.update({
       where: { id },
       data: {
@@ -173,6 +184,7 @@ export async function issueInvoice(id: string) {
         invoiceNumber,
         issueDate,
         templateVersionId: latestVersion?.id ?? null,
+        paymentStatus,
       },
       include: invoiceInclude,
     });

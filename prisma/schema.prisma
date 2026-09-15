@@ -44,6 +44,7 @@ model User {
   createdTemplates Template[]        @relation("TemplateCreatedBy")
   createdVersions  TemplateVersion[] @relation("TemplateVersionCreatedBy")
   createdInvoices  Invoice[]         @relation("InvoiceCreatedBy")
+  recordedPayments Payment[]
 }
 
 // NextAuth.js (Auth.js) v5 required models — Prisma adapter, database sessions.
@@ -325,7 +326,8 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items InvoiceItem[]
+  items    InvoiceItem[]
+  payments Payment[]
 
   @@index([status])
   @@index([paymentStatus])
@@ -347,4 +349,39 @@ model InvoiceItem {
   gstRate     Decimal @default(0) @db.Decimal(5, 2)
   taxAmount   Decimal @default(0) @db.Decimal(14, 2) // server-computed
   lineTotal   Decimal @default(0) @db.Decimal(14, 2) // server-computed
+}
+
+// ---------------------------------------------------------------------------
+// Phase 10 — Payment Tracking
+// ---------------------------------------------------------------------------
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  UPI
+  CARD
+  CASH
+  GATEWAY
+  OTHER
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice       @relation(fields: [invoiceId], references: [id])
+  amount         Decimal       @db.Decimal(14, 2)
+  paymentDate    DateTime
+  method         PaymentMethod
+  transactionRef String?
+  notes          String?
+  // Voided, never deleted — a financial record. Invoice.paidTotal only sums
+  // non-voided payments (see lib/services/payments.ts recomputeInvoicePaymentState).
+  isVoided       Boolean       @default(false)
+  voidedAt       DateTime?
+  voidedReason   String?
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
 }
