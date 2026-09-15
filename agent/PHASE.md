@@ -10,7 +10,7 @@ Core architecture:
 
 The system must also expose an internal REST API so LeadSquared, payment systems, LMS, website, and other internal applications can create and update invoices without directly accessing the database.
 
-> **Status:** Phases 0–8 are done (see `✅ Done` markers below). Detailed
+> **Status:** Phases 0–9 are done (see `✅ Done` markers below). Detailed
 > per-phase notes — what was built, how it was verified, and any
 > implementation deviations from this spec — live in `plan.md` at the repo
 > root, not in this file. This file stays the original phase spec.
@@ -468,7 +468,7 @@ All invoice totals are calculated consistently through one backend engine.
 
 ---
 
-# Phase 9 — Invoice Creation & Management
+# Phase 9 — Invoice Creation & Management ✅ Done
 
 ## Objective
 Build the complete invoice workflow.
