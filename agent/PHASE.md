@@ -10,7 +10,7 @@ Core architecture:
 
 The system must also expose an internal REST API so LeadSquared, payment systems, LMS, website, and other internal applications can create and update invoices without directly accessing the database.
 
-> **Status:** Phases 0–6 are done (see `✅ Done` markers below). Detailed
+> **Status:** Phases 0–7 are done (see `✅ Done` markers below). Detailed
 > per-phase notes — what was built, how it was verified, and any
 > implementation deviations from this spec — live in `plan.md` at the repo
 > root, not in this file. This file stays the original phase spec.
@@ -382,7 +382,7 @@ Template components render real invoice data correctly.
 
 ---
 
-# Phase 7 — Invoice Items Table
+# Phase 7 — Invoice Items Table ✅ Done
 
 ## Objective
 Create the specialized dynamic invoice table.
