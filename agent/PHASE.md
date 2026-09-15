@@ -516,7 +516,7 @@ Team can create, issue, view, search, and manage invoices.
 
 ---
 
-# Phase 10 — Payment Tracking
+# Phase 10 — Payment Tracking ✅ Done
 
 ## Objective
 Track payments against invoices.
