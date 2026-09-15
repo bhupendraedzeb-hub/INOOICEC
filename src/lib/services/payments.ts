@@ -13,7 +13,7 @@ export class OverpaymentError extends Error {}
 // of non-voided Payment rows — the single source of truth, never
 // hand-editable. Must run in the same transaction as the payment write that
 // triggered it.
-async function recomputeInvoicePaymentState(tx: Prisma.TransactionClient, invoiceId: string) {
+export async function recomputeInvoicePaymentState(tx: Prisma.TransactionClient, invoiceId: string) {
   const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
   const activePayments = await tx.payment.findMany({ where: { invoiceId, isVoided: false } });
   const paidTotal = sumMoney(activePayments.map((p) => new Money(p.amount.toString())));

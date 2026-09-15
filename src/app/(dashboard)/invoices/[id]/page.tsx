@@ -11,7 +11,10 @@ import { InvoiceActions } from "@/components/invoices/InvoiceActions";
 import { InvoicePreviewPane } from "@/components/invoices/InvoicePreviewPane";
 import { PaymentForm } from "@/components/invoices/PaymentForm";
 import { PaymentTimeline } from "@/components/invoices/PaymentTimeline";
+import { PaymentLinkForm } from "@/components/invoices/PaymentLinkForm";
+import { PaymentLinkList } from "@/components/invoices/PaymentLinkList";
 import { listPayments } from "@/lib/services/payments";
+import { listPaymentLinks } from "@/lib/services/paymentLinks";
 import type { TemplateDocument } from "@/types/template";
 
 export default async function InvoiceDetailPage({
@@ -75,7 +78,11 @@ export default async function InvoiceDetailPage({
   // ISSUED or CANCELLED — read-only view, rendered from the pinned template
   // version (issued invoices never re-render from a template's current,
   // possibly-since-edited state).
-  const [company, payments] = await Promise.all([getCompanySettings(), listPayments({ invoiceId: invoice.id })]);
+  const [company, payments, paymentLinks] = await Promise.all([
+    getCompanySettings(),
+    listPayments({ invoiceId: invoice.id }),
+    listPaymentLinks({ invoiceId: invoice.id }),
+  ]);
   const version = invoice.templateVersion ?? (await getLatestVersion(invoice.templateId));
   const layout = (version?.layout as unknown as TemplateDocument) ?? null;
 
@@ -151,6 +158,23 @@ export default async function InvoiceDetailPage({
           </div>
           {invoice.status === "ISSUED" && Number(invoice.balanceDue) > 0 && (
             <PaymentForm invoiceId={invoice.id} balanceDue={invoice.balanceDue.toString()} />
+          )}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">Payment Links</h3>
+            <PaymentLinkList
+              links={paymentLinks.map((l) => ({
+                id: l.id,
+                token: l.token,
+                amount: l.amount.toString(),
+                provider: l.provider,
+                status: l.status,
+                expiresAt: l.expiresAt?.toISOString() ?? null,
+                paidAt: l.paidAt?.toISOString() ?? null,
+              }))}
+            />
+          </div>
+          {invoice.status === "ISSUED" && Number(invoice.balanceDue) > 0 && (
+            <PaymentLinkForm invoiceId={invoice.id} balanceDue={invoice.balanceDue.toString()} />
           )}
         </div>
       </div>

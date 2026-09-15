@@ -37,14 +37,15 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  accounts         Account[]
-  sessions         Session[]
-  auditLogs        AuditLog[]
-  apiKeys          ApiKey[]
-  createdTemplates Template[]        @relation("TemplateCreatedBy")
-  createdVersions  TemplateVersion[] @relation("TemplateVersionCreatedBy")
-  createdInvoices  Invoice[]         @relation("InvoiceCreatedBy")
-  recordedPayments Payment[]
+  accounts            Account[]
+  sessions            Session[]
+  auditLogs           AuditLog[]
+  apiKeys             ApiKey[]
+  createdTemplates    Template[]        @relation("TemplateCreatedBy")
+  createdVersions     TemplateVersion[] @relation("TemplateVersionCreatedBy")
+  createdInvoices     Invoice[]         @relation("InvoiceCreatedBy")
+  recordedPayments    Payment[]
+  createdPaymentLinks PaymentLink[]
 }
 
 // NextAuth.js (Auth.js) v5 required models — Prisma adapter, database sessions.
@@ -326,8 +327,9 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items    InvoiceItem[]
-  payments Payment[]
+  items        InvoiceItem[]
+  payments     Payment[]
+  paymentLinks PaymentLink[]
 
   @@index([status])
   @@index([paymentStatus])
@@ -379,9 +381,60 @@ model Payment {
   voidedAt       DateTime?
   voidedReason   String?
 
+  // Set only when this payment was created by the Phase 11 inbound webhook
+  // receiver from a PaymentLink gateway callback (null for manually recorded
+  // payments). The unique constraint is the DB-enforced idempotency backstop
+  // that guarantees the same gateway transaction can never create a second
+  // Payment row, even under a duplicated/retried webhook delivery.
+  paymentLinkId        String?
+  paymentLink          PaymentLink? @relation(fields: [paymentLinkId], references: [id])
+  gatewayTransactionId String?      @unique
+
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11 — Payment Links
+// ---------------------------------------------------------------------------
+
+enum PaymentLinkStatus {
+  ACTIVE
+  PAID
+  EXPIRED
+  DEACTIVATED
+}
+
+model PaymentLink {
+  id        String            @id @default(cuid())
+  // Opaque public identifier (e.g. a future /pay/:token page or the value
+  // handed to a payment gateway when creating its side of the link) —
+  // deliberately not the row id, so the internal cuid never needs to be
+  // exposed to a customer-facing surface.
+  token     String            @unique @default(cuid())
+  invoiceId String
+  invoice   Invoice           @relation(fields: [invoiceId], references: [id])
+  amount    Decimal           @db.Decimal(14, 2)
+  // Free-text gateway label (e.g. "razorpay", "stripe", "manual") — kept
+  // generic per plan.md: no vendor-specific fields or hardcoded integrations.
+  provider  String
+  status    PaymentLinkStatus @default(ACTIVE)
+  expiresAt DateTime?
+
+  // Set once the inbound webhook matches a successful gateway callback to
+  // this link (see lib/services/paymentLinks.ts recordWebhookPayment).
+  externalPaymentId String?
+  paidAt            DateTime?
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payments Payment[]
 
   @@index([invoiceId])
 }
