@@ -29,7 +29,11 @@ type WithAuthedJsonOptions = {
   // only for an API-key actor. A session actor is never scope-gated (its
   // `roles` check above is the only gate that applies to it) and an
   // API-key actor is never role-gated — one request is governed by exactly
-  // one of the two permission models, never both.
+  // one of the two permission models, never both. A route that declares
+  // `roles` but no `scope` (e.g. user/API-key/webhook-endpoint management)
+  // has nothing for an API-key actor to be correctly gated on, so it's
+  // treated as session-only: API keys are rejected outright rather than
+  // silently passing through ungated.
   scope?: string;
 };
 
@@ -52,8 +56,13 @@ export function withAuthedJson<TBody, TParams = Record<string, never>>(
       if (resolved.kind === "session" && options.roles && !options.roles.includes(resolved.session.user.role)) {
         throw new ApiError(403, "Forbidden");
       }
-      if (resolved.kind === "apiKey" && options.scope && !resolved.scopes.includes(options.scope)) {
-        throw new ApiError(403, `Forbidden — API key is missing required scope: ${options.scope}`);
+      if (resolved.kind === "apiKey") {
+        if (options.roles && !options.scope) {
+          throw new ApiError(403, "Forbidden — this action is only available to signed-in users, not API keys");
+        }
+        if (options.scope && !resolved.scopes.includes(options.scope)) {
+          throw new ApiError(403, `Forbidden — API key is missing required scope: ${options.scope}`);
+        }
       }
       const session = resolved.session;
 
