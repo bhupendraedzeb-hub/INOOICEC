@@ -31,6 +31,11 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Phase 18: a lean, self-contained production image — .next/standalone
+  // includes only the files next-server.js's own dependency trace found,
+  // copied into one folder that runs via `node server.js` with no
+  // `pnpm install` step in the final Docker stage.
+  output: "standalone",
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

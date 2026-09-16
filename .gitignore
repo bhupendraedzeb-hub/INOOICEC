@@ -17,6 +17,9 @@
 /tests/.auth/
 /tests/pdf/output/
 
+# database backups (docker/backup.sh output)
+/backups/
+
 # next.js
 /.next/
 /out/
