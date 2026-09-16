@@ -10,7 +10,7 @@ Core architecture:
 
 The system must also expose an internal REST API so LeadSquared, payment systems, LMS, website, and other internal applications can create and update invoices without directly accessing the database.
 
-> **Status:** Phases 0–9 are done (see `✅ Done` markers below). Detailed
+> **Status:** Phases 0–18 are done (see `✅ Done` markers below). Detailed
 > per-phase notes — what was built, how it was verified, and any
 > implementation deviations from this spec — live in `plan.md` at the repo
 > root, not in this file. This file stays the original phase spec.
@@ -899,7 +899,7 @@ A repeatable test suite and production-readiness checklist.
 
 ---
 
-# Phase 18 — Deployment
+# Phase 18 — Deployment ✅ Done
 
 ## Objective
 Deploy the private system safely.
