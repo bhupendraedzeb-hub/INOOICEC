@@ -281,6 +281,17 @@ function LogoView({ context }: { context?: RenderContext }) {
     // eslint-disable-next-line @next/next/no-img-element -- content is a user-provided/resolved arbitrary URL, not a local static asset
     return <img src={src} alt="" className="h-full w-full object-contain" />;
   }
+  // No uploaded logo image on a real invoice/PDF — fall back to the company
+  // name as a text wordmark instead of a design-mode-looking placeholder
+  // box, which would otherwise print on customer-facing output.
+  const name = field("business.name", context);
+  if (name) {
+    return (
+      <div className="flex h-full w-full items-center justify-center overflow-hidden text-center leading-tight font-semibold">
+        {name}
+      </div>
+    );
+  }
   return <StructuralPlaceholder label="Logo" />;
 }
 
