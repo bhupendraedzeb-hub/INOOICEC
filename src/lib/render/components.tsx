@@ -163,6 +163,8 @@ const STRUCTURAL_LABELS: Record<string, string> = {
   terms: "Terms & Conditions",
   notes: "Notes",
   footer: "Footer",
+  receiptDetails: "Receipt Details",
+  paymentSummary: "Payment Summary",
 };
 
 function ShapeView({ props }: { props: ShapeProps }) {
@@ -449,6 +451,35 @@ function PaymentDetailsView({ context }: { context?: RenderContext }) {
   );
 }
 
+function ReceiptDetailsView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.receiptDetails} />;
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <DetailRow label="Receipt #" value={field("receipt.number", context)} />
+      <DetailRow label="Date" value={field("receipt.date", context)} />
+      <DetailRow label="Invoice #" value={field("receipt.linked_invoice_number", context)} />
+    </div>
+  );
+}
+
+function PaymentSummaryView({ context }: { context?: RenderContext }) {
+  if (!context) return <StructuralPlaceholder label={STRUCTURAL_LABELS.paymentSummary} />;
+  const balanceRemaining = field("receipt.balance_remaining", context);
+  return (
+    <div className="flex h-full w-full flex-col gap-0.5 text-xs leading-snug">
+      <div className="flex justify-between gap-2 border-b border-zinc-300 pb-1 font-semibold dark:border-zinc-700">
+        <span>Amount Received</span>
+        <span>{field("receipt.amount_paid", context)}</span>
+      </div>
+      <DetailRow label="Payment Method" value={field("receipt.payment_method", context)} />
+      <DetailRow label="Transaction Ref" value={field("receipt.transaction_ref", context)} />
+      {balanceRemaining && Number(balanceRemaining) > 0 && (
+        <DetailRow label="Balance Remaining" value={balanceRemaining} />
+      )}
+    </div>
+  );
+}
+
 function SignatureView() {
   return (
     <div className="flex h-full w-full flex-col items-end justify-end text-xs">
@@ -544,6 +575,10 @@ export function ComponentContent({
       return <TotalsView context={context} />;
     case "paymentDetails":
       return <PaymentDetailsView context={context} />;
+    case "receiptDetails":
+      return <ReceiptDetailsView context={context} />;
+    case "paymentSummary":
+      return <PaymentSummaryView context={context} />;
     case "signature":
       return <SignatureView />;
     case "terms":

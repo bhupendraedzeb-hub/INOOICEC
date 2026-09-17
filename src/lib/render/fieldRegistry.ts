@@ -11,7 +11,7 @@ export type FieldValueType = "text" | "date" | "currency" | "image";
 export type FieldDefinition = {
   path: string;
   label: string;
-  category: "business" | "customer" | "invoice" | "totals" | "payment";
+  category: "business" | "customer" | "invoice" | "totals" | "payment" | "receipt";
   type: FieldValueType;
 };
 
@@ -60,6 +60,16 @@ export const FIELD_REGISTRY: FieldDefinition[] = [
   { path: "payment.account_number", label: "Account Number", category: "payment", type: "text" },
   { path: "payment.ifsc", label: "IFSC", category: "payment", type: "text" },
   { path: "payment.upi", label: "UPI ID", category: "payment", type: "text" },
+
+  // Receipt (Phase 21) — business/customer/payment categories above are
+  // reused as-is for receipt templates too.
+  { path: "receipt.number", label: "Receipt Number", category: "receipt", type: "text" },
+  { path: "receipt.date", label: "Receipt Date", category: "receipt", type: "date" },
+  { path: "receipt.amount_paid", label: "Amount Paid", category: "receipt", type: "currency" },
+  { path: "receipt.payment_method", label: "Payment Method", category: "receipt", type: "text" },
+  { path: "receipt.transaction_ref", label: "Transaction Reference", category: "receipt", type: "text" },
+  { path: "receipt.linked_invoice_number", label: "Invoice Number", category: "receipt", type: "text" },
+  { path: "receipt.balance_remaining", label: "Balance Remaining on Invoice", category: "receipt", type: "currency" },
 ];
 
 const FIELD_BY_PATH = new Map(FIELD_REGISTRY.map((f) => [f.path, f]));
@@ -78,8 +88,19 @@ export const FIELD_CATEGORIES: FieldDefinition["category"][] = [
   "invoice",
   "totals",
   "payment",
+  "receipt",
 ];
 
 export function fieldsByCategory(category: FieldDefinition["category"]) {
   return FIELD_REGISTRY.filter((f) => f.category === category);
 }
+
+// Which field categories the builder's FieldPicker offers, per document
+// kind (src/components/builder/PropertiesPanel.tsx) — a receipt template
+// should never be offered invoice-only totals.*/invoice.* fields, and vice
+// versa, even though both sets of categories live in the one shared
+// FIELD_REGISTRY above.
+export const CATEGORIES_BY_DOCUMENT_KIND: Record<"invoice" | "receipt", FieldDefinition["category"][]> = {
+  invoice: ["business", "customer", "invoice", "totals", "payment"],
+  receipt: ["business", "customer", "payment", "receipt"],
+};

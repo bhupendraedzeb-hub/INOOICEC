@@ -21,6 +21,9 @@ export const API_KEY_SCOPES = [
   "payment_links:write",
   "settings:read",
   "settings:write",
+  "receipt_templates:read",
+  "receipt_templates:write",
+  "receipts:read",
 ] as const;
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];

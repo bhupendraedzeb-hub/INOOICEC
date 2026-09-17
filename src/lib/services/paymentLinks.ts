@@ -3,6 +3,8 @@ import { Money } from "@/lib/calc/money";
 import { Prisma, type PaymentLink } from "@/generated/prisma/client";
 import { recomputeInvoicePaymentState } from "@/lib/services/payments";
 import { enqueueWebhookEvent } from "@/lib/webhooks/dispatch";
+import { createReceiptForPayment } from "@/lib/services/receipts";
+import { logger } from "@/lib/logger";
 import type { CreatePaymentLinkInput, InboundWebhookInput } from "@/lib/validation/schemas/paymentLink";
 
 // The requested link amount exceeds the invoice's current balance due.
@@ -166,5 +168,13 @@ export async function recordWebhookPayment(
       },
     );
   }
+  // Best-effort, mirroring payments.ts's createPayment — a missing default
+  // receipt template must never fail an inbound gateway callback. Only
+  // reached on a genuinely new payment (the P2002 idempotent-replay branch
+  // above returns before this point, since a receipt would already exist
+  // from the original delivery).
+  await createReceiptForPayment(result.payment, organizationId).catch((err) => {
+    logger.error({ err, paymentId: result.payment.id, organizationId }, "failed to auto-generate receipt for payment");
+  });
   return { payment: result.payment, organizationId };
 }

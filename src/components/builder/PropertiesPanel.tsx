@@ -13,12 +13,14 @@ import type {
 } from "@/types/template";
 import { COMPONENT_LABELS } from "@/components/builder/componentDefaults";
 import { FieldPicker } from "@/components/builder/FieldPicker";
+import { CATEGORIES_BY_DOCUMENT_KIND } from "@/lib/render/fieldRegistry";
 
 type Props = {
   component: ComponentNode | null;
   onChange: (updated: ComponentNode) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  documentKind?: "invoice" | "receipt";
 };
 
 const ALL_COLUMN_KEYS: Array<{ key: ItemsTableColumnKey; label: string }> = [
@@ -47,7 +49,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputCls =
   "rounded-md border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900";
 
-export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: Props) {
+export function PropertiesPanel({ component, onChange, onDelete, onDuplicate, documentKind = "invoice" }: Props) {
   if (!component) {
     return (
       <div className="w-64 flex-shrink-0 border-l border-zinc-200 p-3 text-xs text-zinc-400 dark:border-zinc-800">
@@ -58,6 +60,7 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
 
   const c = component;
   const style = c.props as Partial<BaseStyle>;
+  const fieldCategories = CATEGORIES_BY_DOCUMENT_KIND[documentKind];
 
   function update(patch: Partial<ComponentNode>) {
     onChange({ ...c, ...patch });
@@ -159,6 +162,7 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
               </button>
               <FieldPicker
                 allowedTypes={["text", "date", "currency"]}
+                categories={fieldCategories}
                 onSelect={(path) =>
                   updateProps<TextProps>({
                     content: [...(c.props as TextProps).content, { kind: "field", path }],
@@ -197,6 +201,7 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
           </Field>
           <FieldPicker
             allowedTypes={["image"]}
+            categories={fieldCategories}
             onSelect={(path) => updateProps<ImageProps>({ src: { kind: "field", path } })}
           />
           <Field label="Fit">
@@ -276,6 +281,7 @@ export function PropertiesPanel({ component, onChange, onDelete, onDuplicate }: 
           </Field>
           <FieldPicker
             allowedTypes={["text"]}
+            categories={fieldCategories}
             onSelect={(path) => updateProps<QrCodeProps>({ source: { field: { kind: "field", path } } })}
           />
         </>

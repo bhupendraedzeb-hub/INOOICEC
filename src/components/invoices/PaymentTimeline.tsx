@@ -12,6 +12,11 @@ export type PaymentRow = {
   notes: string | null;
   isVoided: boolean;
   voidedReason: string | null;
+  // Null when no default receipt template was configured for the
+  // organization at the time this payment was recorded (see
+  // lib/services/receipts.ts createReceiptForPayment) — the payment itself
+  // always still succeeds either way.
+  receiptId: string | null;
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -58,6 +63,7 @@ export function PaymentTimeline({ payments }: { payments: PaymentRow[] }) {
           <th className="py-1.5 font-medium">Method</th>
           <th className="py-1.5 font-medium">Reference</th>
           <th className="py-1.5 font-medium">Status</th>
+          <th className="py-1.5 font-medium">Receipt</th>
           <th className="py-1.5 font-medium" />
         </tr>
       </thead>
@@ -81,6 +87,18 @@ export function PaymentTimeline({ payments }: { payments: PaymentRow[] }) {
                 <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-950 dark:text-green-300">
                   Active
                 </span>
+              )}
+            </td>
+            <td className="py-1.5">
+              {p.receiptId ? (
+                <a
+                  href={`/api/v1/receipts/${p.receiptId}/pdf`}
+                  className="text-xs text-zinc-900 hover:underline dark:text-zinc-50"
+                >
+                  Download
+                </a>
+              ) : (
+                <span className="text-xs text-zinc-400">—</span>
               )}
             </td>
             <td className="py-1.5">

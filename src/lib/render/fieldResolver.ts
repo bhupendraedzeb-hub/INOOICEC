@@ -32,6 +32,13 @@ export type RenderContext = {
     >
   >;
   payment: Partial<Record<"bank_name" | "account_number" | "ifsc" | "upi", string>>;
+  // Phase 21 — only populated when this context is being built for a
+  // Receipt (see buildReceiptRenderContext); optional so every existing
+  // invoice-context object literal built by buildRenderContext stays valid
+  // untouched.
+  receipt?: Partial<
+    Record<"number" | "date" | "amount_paid" | "payment_method" | "transaction_ref" | "linked_invoice_number" | "balance_remaining", string>
+  >;
   // Free-form per-invoice text (Phase 9's Invoice.notes/terms). Not part of
   // the FieldRef-resolvable buckets above — these are shown as whole blocks
   // by the dedicated "notes"/"terms" structural component types (Phase 12),

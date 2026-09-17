@@ -99,6 +99,9 @@ const componentSchema = z.discriminatedUnion("type", [
       "terms",
       "notes",
       "footer",
+      // Phase 21 — Payment Receipts (src/types/template.ts COMPONENT_TYPES)
+      "receiptDetails",
+      "paymentSummary",
     ] as const
   ).map((type) => z.object({ ...baseComponentFields, type: z.literal(type), props: baseStyleSchema })),
 ]);

@@ -121,6 +121,7 @@ export default async function InvoiceDetailPage({
                 notes: p.notes,
                 isVoided: p.isVoided,
                 voidedReason: p.voidedReason,
+                receiptId: p.receipt?.id ?? null,
               }))}
             />
           </div>

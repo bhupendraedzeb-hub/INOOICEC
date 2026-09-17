@@ -1,25 +1,54 @@
 import type { ComponentNode, ComponentProps, ComponentType, ItemsTableColumnKey } from "@/types/template";
 
-export const PALETTE_GROUPS: Array<{ title: string; types: ComponentType[] }> = [
-  { title: "Content", types: ["text", "image", "logo", "divider", "shape", "qrcode"] },
-  {
-    title: "Invoice",
-    types: [
-      "header",
-      "businessDetails",
-      "customerDetails",
-      "invoiceDetails",
-      "itemsTable",
-      "taxSummary",
-      "totals",
-      "paymentDetails",
-      "signature",
-      "terms",
-      "notes",
-      "footer",
-    ],
-  },
-];
+const SHARED_CONTENT_TYPES: ComponentType[] = ["text", "image", "logo", "divider", "shape", "qrcode"];
+
+// Which palette groups src/components/builder/Palette.tsx shows, per
+// document kind (see TemplateBuilder's documentKind prop). The "Content"
+// group is reused verbatim by both kinds; only the structural-block group
+// differs, since receipt templates bind to receiptDetails/paymentSummary
+// instead of invoiceDetails/totals/taxSummary — but still reuse
+// header/businessDetails/customerDetails/paymentDetails/signature/terms/
+// notes/footer as-is.
+export const PALETTE_GROUPS_BY_KIND: Record<"invoice" | "receipt", Array<{ title: string; types: ComponentType[] }>> = {
+  invoice: [
+    { title: "Content", types: SHARED_CONTENT_TYPES },
+    {
+      title: "Invoice",
+      types: [
+        "header",
+        "businessDetails",
+        "customerDetails",
+        "invoiceDetails",
+        "itemsTable",
+        "taxSummary",
+        "totals",
+        "paymentDetails",
+        "signature",
+        "terms",
+        "notes",
+        "footer",
+      ],
+    },
+  ],
+  receipt: [
+    { title: "Content", types: SHARED_CONTENT_TYPES },
+    {
+      title: "Receipt",
+      types: [
+        "header",
+        "businessDetails",
+        "customerDetails",
+        "receiptDetails",
+        "paymentSummary",
+        "paymentDetails",
+        "signature",
+        "terms",
+        "notes",
+        "footer",
+      ],
+    },
+  ],
+};
 
 export const COMPONENT_LABELS: Record<ComponentType, string> = {
   text: "Text",
@@ -40,6 +69,8 @@ export const COMPONENT_LABELS: Record<ComponentType, string> = {
   terms: "Terms & Conditions",
   notes: "Notes",
   footer: "Footer",
+  receiptDetails: "Receipt Details",
+  paymentSummary: "Payment Summary",
 };
 
 const DEFAULT_ITEMS_TABLE_COLUMNS: Array<{ key: ItemsTableColumnKey; label: string; widthPercent: number }> = [

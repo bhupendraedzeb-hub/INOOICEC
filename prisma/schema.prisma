@@ -43,6 +43,9 @@ model Organization {
   payments              Payment[]
   paymentLinks          PaymentLink[]
   webhookEndpoints      WebhookEndpoint[]
+  receiptTemplates      ReceiptTemplate[]
+  receiptNumberCounters ReceiptNumberCounter[]
+  receipts              Receipt[]
 }
 
 enum UserRole {
@@ -72,12 +75,14 @@ model User {
   sessions                Session[]
   auditLogs               AuditLog[]
   apiKeys                 ApiKey[]
-  createdTemplates        Template[]        @relation("TemplateCreatedBy")
-  createdVersions         TemplateVersion[] @relation("TemplateVersionCreatedBy")
-  createdInvoices         Invoice[]         @relation("InvoiceCreatedBy")
+  createdTemplates        Template[]               @relation("TemplateCreatedBy")
+  createdVersions         TemplateVersion[]        @relation("TemplateVersionCreatedBy")
+  createdInvoices         Invoice[]                @relation("InvoiceCreatedBy")
   recordedPayments        Payment[]
   createdPaymentLinks     PaymentLink[]
   createdWebhookEndpoints WebhookEndpoint[]
+  createdReceiptTemplates ReceiptTemplate[]        @relation("ReceiptTemplateCreatedBy")
+  createdReceiptVersions  ReceiptTemplateVersion[] @relation("ReceiptTemplateVersionCreatedBy")
 
   @@index([organizationId])
 }
@@ -152,6 +157,8 @@ model CompanySettings {
   currency            String  @default("INR")
   invoicePrefix       String  @default("INV")
   invoiceNumberFormat String  @default("{prefix}-{fy}-{seq}")
+  receiptPrefix       String  @default("RCPT")
+  receiptNumberFormat String  @default("{prefix}-{fy}-{seq}")
   defaultPaymentTerms String?
   defaultNotes        String?
   defaultTerms        String?
@@ -477,6 +484,12 @@ model Payment {
   // edits of the same payment — createdAt alone would collide).
   updatedAt   DateTime @updatedAt
 
+  // Auto-generated best-effort when the payment is created (see
+  // lib/services/receipts.ts) — null if no default ReceiptTemplate existed
+  // for the organization at the time, so a missing/misconfigured template
+  // never blocks recording a real payment.
+  receipt Receipt?
+
   @@index([organizationId])
   @@index([invoiceId])
 }
@@ -597,4 +610,96 @@ model WebhookDelivery {
 
   @@index([endpointId])
   @@index([status, nextAttemptAt])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 21 — Payment Receipts
+// Mirrors Template/TemplateVersion/InvoiceNumberCounter exactly, as a
+// separate additive sibling rather than a discriminator column on those
+// models — zero risk to any existing invoice behavior, constraint, or
+// migration. See src/lib/services/receiptTemplates.ts / receipts.ts.
+// ---------------------------------------------------------------------------
+
+model ReceiptTemplate {
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  thumbnailUrl   String?
+  status         TemplateStatus @default(DRAFT)
+  // Per-organization default — the one a new Receipt auto-pins to at
+  // creation time (see lib/services/receipts.ts). Reset logic must scope
+  // by organizationId, same reasoning as Template.isDefault.
+  isDefault Boolean @default(false)
+
+  createdById String
+  updatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization             @relation(fields: [organizationId], references: [id])
+  createdBy    User                     @relation("ReceiptTemplateCreatedBy", fields: [createdById], references: [id])
+  versions     ReceiptTemplateVersion[]
+  receipts     Receipt[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+// Insert-only, same immutability rule as TemplateVersion: once a Receipt
+// pins a version, editing the template afterward never changes it.
+model ReceiptTemplateVersion {
+  id            String @id @default(cuid())
+  templateId    String
+  versionNumber Int
+  layout        Json
+
+  createdById String
+  createdAt   DateTime @default(now())
+
+  template  ReceiptTemplate @relation(fields: [templateId], references: [id])
+  createdBy User            @relation("ReceiptTemplateVersionCreatedBy", fields: [createdById], references: [id])
+  receipts  Receipt[]
+
+  @@unique([templateId, versionNumber])
+}
+
+// Same atomic-upsert numbering pattern as InvoiceNumberCounter, kept as a
+// fully separate counter/table so receipt numbering can never interfere
+// with (or share a sequence with) invoice numbering.
+model ReceiptNumberCounter {
+  id             String @id @default(cuid())
+  organizationId String
+  prefix         String
+  financialYear  String
+  lastSequence   Int    @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, prefix, financialYear])
+}
+
+// Auto-generated best-effort whenever a Payment is recorded (see
+// lib/services/receipts.ts createReceiptForPayment) — one per payment.
+// Pins templateVersionId at creation, exactly like Invoice pins its
+// TemplateVersion at /issue: editing the receipt template later never
+// retroactively changes a receipt already generated.
+model Receipt {
+  id                String   @id @default(cuid())
+  organizationId    String
+  receiptNumber     String
+  paymentId         String   @unique
+  templateId        String
+  templateVersionId String
+  issueDate         DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  organization    Organization           @relation(fields: [organizationId], references: [id])
+  payment         Payment                @relation(fields: [paymentId], references: [id])
+  template        ReceiptTemplate        @relation(fields: [templateId], references: [id])
+  templateVersion ReceiptTemplateVersion @relation(fields: [templateVersionId], references: [id])
+
+  @@unique([organizationId, receiptNumber])
+  @@index([organizationId])
 }

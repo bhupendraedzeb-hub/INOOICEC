@@ -19,6 +19,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/templates" className="hover:text-zinc-950 dark:hover:text-zinc-50">
             Templates
           </Link>
+          <Link href="/receipt-templates" className="hover:text-zinc-950 dark:hover:text-zinc-50">
+            Receipt Templates
+          </Link>
           <Link href="/customers" className="hover:text-zinc-950 dark:hover:text-zinc-50">
             Customers
           </Link>

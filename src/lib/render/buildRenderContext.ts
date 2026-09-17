@@ -70,6 +70,45 @@ export type ItemForContext = {
   lineTotal: string;
 };
 
+// Shared by buildRenderContext (invoice) and buildReceiptRenderContext
+// (Phase 21) — the business/customer/payment buckets are identical company
+// and customer data regardless of which document is being rendered.
+function buildBusinessBucket(company: CompanyForContext): RenderContext["business"] {
+  const address = [company.addressLine1, company.addressLine2, company.city, company.state, company.postalCode, company.country]
+    .filter(Boolean)
+    .join(", ");
+  return {
+    logo: company.logoUrl ?? undefined,
+    name: company.name,
+    address: address || undefined,
+    gstin: company.gstin ?? undefined,
+    phone: company.phone ?? undefined,
+    email: company.email ?? undefined,
+    website: company.website ?? undefined,
+  };
+}
+
+function buildCustomerBucket(customer: CustomerForContext): RenderContext["customer"] {
+  return {
+    name: customer.name,
+    company: customer.companyName ?? undefined,
+    gstin: customer.gstin ?? undefined,
+    address: customer.billingAddress ?? undefined,
+    shipping_address: customer.shippingAddress ?? undefined,
+    phone: customer.phone ?? undefined,
+    email: customer.email ?? undefined,
+  };
+}
+
+function buildPaymentBucket(company: CompanyForContext): RenderContext["payment"] {
+  return {
+    bank_name: company.bankName ?? undefined,
+    account_number: company.bankAccountNumber ?? undefined,
+    ifsc: company.bankIfsc ?? undefined,
+    upi: company.upiId ?? undefined,
+  };
+}
+
 export function buildRenderContext(opts: {
   company: CompanyForContext;
   customer: CustomerForContext;
@@ -77,29 +116,10 @@ export function buildRenderContext(opts: {
   items?: ItemForContext[];
 }): RenderContext {
   const { company, customer, invoice, items } = opts;
-  const address = [company.addressLine1, company.addressLine2, company.city, company.state, company.postalCode, company.country]
-    .filter(Boolean)
-    .join(", ");
 
   return {
-    business: {
-      logo: company.logoUrl ?? undefined,
-      name: company.name,
-      address: address || undefined,
-      gstin: company.gstin ?? undefined,
-      phone: company.phone ?? undefined,
-      email: company.email ?? undefined,
-      website: company.website ?? undefined,
-    },
-    customer: {
-      name: customer.name,
-      company: customer.companyName ?? undefined,
-      gstin: customer.gstin ?? undefined,
-      address: customer.billingAddress ?? undefined,
-      shipping_address: customer.shippingAddress ?? undefined,
-      phone: customer.phone ?? undefined,
-      email: customer.email ?? undefined,
-    },
+    business: buildBusinessBucket(company),
+    customer: buildCustomerBucket(customer),
     invoice: {
       number: invoice.invoiceNumber ?? undefined,
       date: invoice.issueDateIso ?? undefined,
@@ -119,12 +139,7 @@ export function buildRenderContext(opts: {
       paid: invoice.paidTotal,
       balance: invoice.balanceDue,
     },
-    payment: {
-      bank_name: company.bankName ?? undefined,
-      account_number: company.bankAccountNumber ?? undefined,
-      ifsc: company.bankIfsc ?? undefined,
-      upi: company.upiId ?? undefined,
-    },
+    payment: buildPaymentBucket(company),
     notes: invoice.notes ?? undefined,
     terms: invoice.terms ?? undefined,
     items: items?.map((item, i) => ({
@@ -140,5 +155,46 @@ export function buildRenderContext(opts: {
       taxAmount: item.taxAmount,
       amount: item.lineTotal,
     })),
+  };
+}
+
+// Phase 21 — Payment Receipts. Business/customer/payment buckets are
+// identical to the invoice path (reused via the helpers above); invoice and
+// totals buckets are left empty (receipt templates never bind to
+// invoice.*/totals.* paths — see fieldRegistry.ts's per-kind category
+// filtering in the builder), and a new `receipt` bucket carries the
+// receipt-specific fields instead.
+export type ReceiptForContext = {
+  receiptNumber: string;
+  issueDateIso: string;
+  amountPaid: string;
+  paymentMethod: string;
+  transactionRef: string | null;
+  linkedInvoiceNumber: string | null;
+  balanceRemaining: string | null;
+};
+
+export function buildReceiptRenderContext(opts: {
+  company: CompanyForContext;
+  customer: CustomerForContext;
+  receipt: ReceiptForContext;
+}): RenderContext {
+  const { company, customer, receipt } = opts;
+
+  return {
+    business: buildBusinessBucket(company),
+    customer: buildCustomerBucket(customer),
+    invoice: {},
+    totals: {},
+    payment: buildPaymentBucket(company),
+    receipt: {
+      number: receipt.receiptNumber,
+      date: receipt.issueDateIso,
+      amount_paid: receipt.amountPaid,
+      payment_method: receipt.paymentMethod,
+      transaction_ref: receipt.transactionRef ?? undefined,
+      linked_invoice_number: receipt.linkedInvoiceNumber ?? undefined,
+      balance_remaining: receipt.balanceRemaining ?? undefined,
+    },
   };
 }

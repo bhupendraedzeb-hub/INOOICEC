@@ -23,6 +23,12 @@ export const COMPONENT_TYPES = [
   "terms",
   "notes",
   "footer",
+  // Phase 21 — Payment Receipts. Every other type above is reused as-is by
+  // receipt templates (header/logo/businessDetails/customerDetails/
+  // paymentDetails/signature/terms/notes/footer/qrcode); these two are
+  // receipt-specific.
+  "receiptDetails",
+  "paymentSummary",
 ] as const;
 
 export type ComponentType = (typeof COMPONENT_TYPES)[number];

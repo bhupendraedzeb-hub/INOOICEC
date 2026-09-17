@@ -18,10 +18,17 @@ export function TemplateBuilder({
   templateId,
   initialLayout,
   initialVersionNumber,
+  documentKind = "invoice",
 }: {
   templateId: string;
   initialLayout: TemplateDocument;
   initialVersionNumber: number;
+  // Selects which save endpoint and palette/field-category content this
+  // builder instance uses (see componentDefaults.ts/fieldRegistry.ts) — the
+  // drag/resize/undo/redo/save engine below is otherwise fully generic and
+  // unaffected by this prop. Defaults to "invoice" so the existing invoice
+  // builder page (which doesn't pass this prop) is unaffected.
+  documentKind?: "invoice" | "receipt";
 }) {
   const router = useRouter();
   const [document, setDocument] = useState<TemplateDocument>(initialLayout);
@@ -146,7 +153,8 @@ export function TemplateBuilder({
 
   async function save() {
     setSaveState("saving");
-    const res = await fetch(`/api/v1/templates/${templateId}/versions`, {
+    const endpoint = documentKind === "receipt" ? "receipt-templates" : "templates";
+    const res = await fetch(`/api/v1/${endpoint}/${templateId}/versions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ layout: document }),
@@ -165,8 +173,11 @@ export function TemplateBuilder({
     <div className="flex h-screen flex-col">
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
         <div className="flex items-center gap-2">
-          <Link href="/templates" className="mr-2 text-xs text-zinc-500 hover:underline dark:text-zinc-400">
-            ← Templates
+          <Link
+            href={documentKind === "receipt" ? "/receipt-templates" : "/templates"}
+            className="mr-2 text-xs text-zinc-500 hover:underline dark:text-zinc-400"
+          >
+            ← {documentKind === "receipt" ? "Receipt Templates" : "Templates"}
           </Link>
           <button type="button" onClick={undo} disabled={past.length === 0} className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-40 dark:border-zinc-700">
             Undo
@@ -236,7 +247,7 @@ export function TemplateBuilder({
       ) : (
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           <div className="flex flex-1 overflow-hidden">
-            <Palette />
+            <Palette documentKind={documentKind} />
             <Canvas
               document={document}
               zoom={zoom}
@@ -251,6 +262,7 @@ export function TemplateBuilder({
               onChange={updateComponent}
               onDelete={deleteComponent}
               onDuplicate={duplicateComponent}
+              documentKind={documentKind}
             />
           </div>
         </DndContext>

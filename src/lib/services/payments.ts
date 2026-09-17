@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { Money, toMoneyString, sumMoney } from "@/lib/calc/money";
 import { derivePaymentStatus } from "@/lib/calc/gstEngine";
 import { enqueueWebhookEvent } from "@/lib/webhooks/dispatch";
+import { createReceiptForPayment } from "@/lib/services/receipts";
+import { logger } from "@/lib/logger";
 import type { PaymentMethod, Prisma } from "@/generated/prisma/client";
 import type { CreatePaymentInput, UpdatePaymentInput } from "@/lib/validation/schemas/payment";
 
@@ -57,6 +59,7 @@ async function enqueuePaymentCompletedIfJust(
 export async function listPayments(organizationId: string, opts: { invoiceId?: string }) {
   return db.payment.findMany({
     where: { organizationId, ...(opts.invoiceId ? { invoiceId: opts.invoiceId } : {}) },
+    include: { receipt: { select: { id: true } } },
     orderBy: { paymentDate: "desc" },
   });
 }
@@ -99,6 +102,11 @@ export async function createPayment(input: CreatePaymentInput, actorId: string, 
     method: result.payment.method,
   });
   await enqueuePaymentCompletedIfJust(result.justCompleted, result.updatedInvoice);
+  // Best-effort, after the payment is already durably recorded — a missing
+  // default receipt template must never fail a real payment write.
+  await createReceiptForPayment(result.payment, organizationId).catch((err) => {
+    logger.error({ err, paymentId: result.payment.id, organizationId }, "failed to auto-generate receipt for payment");
+  });
   return result.payment;
 }
 

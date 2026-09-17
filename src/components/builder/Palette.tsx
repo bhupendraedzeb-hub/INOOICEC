@@ -2,7 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import type { ComponentType } from "@/types/template";
-import { PALETTE_GROUPS, COMPONENT_LABELS } from "@/components/builder/componentDefaults";
+import { PALETTE_GROUPS_BY_KIND, COMPONENT_LABELS } from "@/components/builder/componentDefaults";
 
 function PaletteItem({ type }: { type: ComponentType }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -24,11 +24,11 @@ function PaletteItem({ type }: { type: ComponentType }) {
   );
 }
 
-export function Palette() {
+export function Palette({ documentKind = "invoice" }: { documentKind?: "invoice" | "receipt" }) {
   return (
     <div className="flex w-48 flex-shrink-0 flex-col gap-4 overflow-y-auto border-r border-zinc-200 p-3 dark:border-zinc-800">
       <p className="text-xs text-zinc-400">Drag a component onto the canvas</p>
-      {PALETTE_GROUPS.map((group) => (
+      {PALETTE_GROUPS_BY_KIND[documentKind].map((group) => (
         <div key={group.title} className="flex flex-col gap-1.5">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">{group.title}</h3>
           {group.types.map((type) => (
