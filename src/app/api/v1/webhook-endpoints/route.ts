@@ -9,8 +9,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 // same gating (and isn't exposed to API-key scopes at all).
 export const GET = withAuthedJson(
   null,
-  async () => {
-    const endpoints = await listWebhookEndpoints();
+  async ({ session }) => {
+    const endpoints = await listWebhookEndpoints(session.user.organizationId);
     return NextResponse.json(endpoints);
   },
   { roles: ["OWNER", "ADMIN"] },
@@ -19,8 +19,9 @@ export const GET = withAuthedJson(
 export const POST = withAuthedJson(
   createWebhookEndpointSchema,
   async ({ session, body }) => {
-    const endpoint = await createWebhookEndpoint(body, session.user.id);
+    const endpoint = await createWebhookEndpoint(body, session.user.id, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "webhook_endpoint.created",
       entityType: "WebhookEndpoint",

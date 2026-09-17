@@ -6,10 +6,10 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson(
   null,
-  async ({ request }) => {
+  async ({ request, session }) => {
     const q = request.nextUrl.searchParams.get("q") ?? undefined;
     const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "true";
-    const products = await listProducts({ q, includeArchived });
+    const products = await listProducts(session.user.organizationId, { q, includeArchived });
     return NextResponse.json(products);
   },
   { scope: "products:read" },
@@ -18,8 +18,9 @@ export const GET = withAuthedJson(
 export const POST = withAuthedJson(
   productSchema,
   async ({ session, body }) => {
-    const product = await createProduct(body);
+    const product = await createProduct(body, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "product.created",
       entityType: "Product",

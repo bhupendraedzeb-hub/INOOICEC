@@ -4,7 +4,7 @@ import { CompanySettingsForm } from "@/components/settings/CompanySettingsForm";
 
 export default async function CompanySettingsPage() {
   const session = await auth();
-  const settings = await getCompanySettings();
+  const settings = await getCompanySettings(session!.user.organizationId);
   const canEdit = session?.user.role === "OWNER" || session?.user.role === "ADMIN";
 
   return (

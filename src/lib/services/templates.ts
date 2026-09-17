@@ -6,10 +6,11 @@ import type { Prisma } from "@/generated/prisma/client";
 
 const TEMPLATE_STATUSES = ["DRAFT", "ACTIVE", "ARCHIVED"] as const;
 
-export async function listTemplates(opts: { q?: string; status?: string }) {
+export async function listTemplates(organizationId: string, opts: { q?: string; status?: string }) {
   const status = parseEnumParam(opts.status ?? null, TEMPLATE_STATUSES);
   return db.template.findMany({
     where: {
+      organizationId,
       ...(status ? { status } : {}),
       ...(opts.q ? { name: { contains: opts.q, mode: "insensitive" as const } } : {}),
     },
@@ -17,20 +18,22 @@ export async function listTemplates(opts: { q?: string; status?: string }) {
   });
 }
 
-export async function getTemplate(id: string) {
-  return db.template.findUnique({ where: { id } });
+export async function getTemplate(id: string, organizationId: string) {
+  return db.template.findFirst({ where: { id, organizationId } });
 }
 
-export async function getLatestVersion(templateId: string) {
+// TemplateVersion has no organizationId column of its own — it inherits
+// scope via its parent Template relation.
+export async function getLatestVersion(templateId: string, organizationId: string) {
   return db.templateVersion.findFirst({
-    where: { templateId },
+    where: { templateId, template: { organizationId } },
     orderBy: { versionNumber: "desc" },
   });
 }
 
-export async function listVersions(templateId: string) {
+export async function listVersions(templateId: string, organizationId: string) {
   return db.templateVersion.findMany({
-    where: { templateId },
+    where: { templateId, template: { organizationId } },
     orderBy: { versionNumber: "desc" },
   });
 }
@@ -38,13 +41,16 @@ export async function listVersions(templateId: string) {
 // Creates the Template row plus its first (version 1) TemplateVersion, seeded
 // with an empty starter layout — the visual builder (Phase 5) is what
 // actually populates components; Phase 4 only establishes the data model.
-export async function createTemplate(data: TemplateMetadataInput, actorId: string) {
+export async function createTemplate(data: TemplateMetadataInput, actorId: string, organizationId: string) {
   return db.$transaction(async (tx) => {
     if (data.isDefault) {
-      await tx.template.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
+      // Scoped by organizationId — otherwise this would silently unset
+      // another organization's default template.
+      await tx.template.updateMany({ where: { organizationId, isDefault: true }, data: { isDefault: false } });
     }
     const template = await tx.template.create({
       data: {
+        organizationId,
         name: data.name,
         description: data.description || null,
         thumbnailUrl: data.thumbnailUrl || null,
@@ -67,13 +73,17 @@ export async function createTemplate(data: TemplateMetadataInput, actorId: strin
 
 export async function updateTemplateMetadata(
   id: string,
+  organizationId: string,
   data: TemplateMetadataInput,
   actorId: string,
 ) {
   return db.$transaction(async (tx) => {
+    await tx.template.findFirstOrThrow({ where: { id, organizationId } });
     if (data.isDefault) {
+      // Scoped by organizationId — otherwise this would silently unset
+      // another organization's default template.
       await tx.template.updateMany({
-        where: { isDefault: true, NOT: { id } },
+        where: { organizationId, isDefault: true, NOT: { id } },
         data: { isDefault: false },
       });
     }
@@ -94,7 +104,8 @@ export async function updateTemplateMetadata(
 // Soft delete: Templates aren't hard-deleted (consistent with the platform's
 // "financial records / design assets aren't silently destroyed" posture, and
 // once Invoices exist in Phase 9 a Template may already be referenced).
-export async function archiveTemplate(id: string) {
+export async function archiveTemplate(id: string, organizationId: string) {
+  await db.template.findFirstOrThrow({ where: { id, organizationId } });
   return db.template.update({ where: { id }, data: { status: "ARCHIVED", isDefault: false } });
 }
 
@@ -102,10 +113,12 @@ export async function archiveTemplate(id: string) {
 // existing versions is enforced simply by never writing to them again.
 export async function createTemplateVersion(
   templateId: string,
+  organizationId: string,
   layout: TemplateDocument,
   actorId: string,
 ) {
-  const latest = await getLatestVersion(templateId);
+  await db.template.findFirstOrThrow({ where: { id: templateId, organizationId } });
+  const latest = await getLatestVersion(templateId, organizationId);
   const nextVersionNumber = (latest?.versionNumber ?? 0) + 1;
   return db.templateVersion.create({
     data: {
@@ -117,14 +130,15 @@ export async function createTemplateVersion(
   });
 }
 
-export async function duplicateTemplate(id: string, actorId: string) {
-  const source = await getTemplate(id);
+export async function duplicateTemplate(id: string, organizationId: string, actorId: string) {
+  const source = await getTemplate(id, organizationId);
   if (!source) return null;
-  const latestVersion = await getLatestVersion(id);
+  const latestVersion = await getLatestVersion(id, organizationId);
 
   return db.$transaction(async (tx) => {
     const copy = await tx.template.create({
       data: {
+        organizationId,
         name: `${source.name} (Copy)`,
         description: source.description,
         thumbnailUrl: source.thumbnailUrl,

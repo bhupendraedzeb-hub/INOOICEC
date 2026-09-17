@@ -6,7 +6,7 @@ import { WebhookEndpointList } from "@/components/settings/WebhookEndpointList";
 export default async function WebhooksPage() {
   const session = await auth();
   const canManage = session?.user.role === "OWNER" || session?.user.role === "ADMIN";
-  const endpoints = await listWebhookEndpoints();
+  const endpoints = await listWebhookEndpoints(session!.user.organizationId);
 
   return (
     <div className="max-w-3xl">

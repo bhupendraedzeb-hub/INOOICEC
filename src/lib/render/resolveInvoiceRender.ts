@@ -1,4 +1,4 @@
-import { getInvoice } from "@/lib/services/invoices";
+import { getInvoiceForInternalRender } from "@/lib/services/invoices";
 import { getCompanySettings } from "@/lib/services/companySettings";
 import { getLatestVersion } from "@/lib/services/templates";
 import { buildRenderContext } from "@/lib/render/buildRenderContext";
@@ -10,12 +10,20 @@ import type { TemplateDocument } from "@/types/template";
 // TemplateRenderer/MultiPageRenderer component tree. Issued invoices always
 // resolve their pinned TemplateVersion; drafts follow the template's current
 // (latest) version since nothing is pinned yet.
+//
+// Deliberately does not take an organizationId — this is reached both by
+// the internal token-gated render route (no session to scope by; see
+// getInvoiceForInternalRender) and, via the /preview API route, by a real
+// session/API-key actor — that route is responsible for its own org
+// ownership check on invoiceId before calling in here. The invoice's own
+// organizationId (once fetched) is what scopes every subsequent lookup
+// below, so the result is always internally org-consistent either way.
 export async function resolveInvoiceRenderData(invoiceId: string) {
-  const invoice = await getInvoice(invoiceId);
+  const invoice = await getInvoiceForInternalRender(invoiceId);
   if (!invoice) return null;
-  const company = await getCompanySettings();
+  const company = await getCompanySettings(invoice.organizationId);
 
-  const version = invoice.templateVersion ?? (await getLatestVersion(invoice.templateId));
+  const version = invoice.templateVersion ?? (await getLatestVersion(invoice.templateId, invoice.organizationId));
   const layout = (version?.layout as unknown as TemplateDocument) ?? null;
 
   const context = buildRenderContext({

@@ -1,12 +1,13 @@
+import Link from "next/link";
 import { signIn } from "@/lib/auth/auth";
 import { AuthError } from "next-auth";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; signup?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, signup } = await searchParams;
 
   async function login(formData: FormData) {
     "use server";
@@ -34,6 +35,11 @@ export default async function LoginPage({
         {error && (
           <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
             Invalid email or password.
+          </p>
+        )}
+        {signup === "success" && (
+          <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700 dark:bg-green-950 dark:text-green-300">
+            Account created — sign in below.
           </p>
         )}
         <form action={login} className="flex flex-col gap-4">
@@ -68,6 +74,12 @@ export default async function LoginPage({
             Sign in
           </button>
         </form>
+        <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
+          New here?{" "}
+          <Link href="/signup" className="text-zinc-900 hover:underline dark:text-zinc-50">
+            Create an organization
+          </Link>
+        </p>
       </div>
     </div>
   );

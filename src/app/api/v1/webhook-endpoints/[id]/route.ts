@@ -6,8 +6,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const endpoint = await getWebhookEndpoint(params.id);
+  async ({ session, params }) => {
+    const endpoint = await getWebhookEndpoint(params.id, session.user.organizationId);
     if (!endpoint) throw new ApiError(404, "Webhook endpoint not found");
     return NextResponse.json(endpoint);
   },
@@ -20,10 +20,11 @@ export const GET = withAuthedJson<undefined, { id: string }>(
 export const PUT = withAuthedJson<UpdateWebhookEndpointInput, { id: string }>(
   updateWebhookEndpointSchema,
   async ({ session, body, params }) => {
-    const existing = await getWebhookEndpoint(params.id);
+    const existing = await getWebhookEndpoint(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Webhook endpoint not found");
-    const endpoint = await updateWebhookEndpoint(params.id, body);
+    const endpoint = await updateWebhookEndpoint(params.id, session.user.organizationId, body);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "webhook_endpoint.updated",
       entityType: "WebhookEndpoint",

@@ -7,16 +7,17 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 // OWNER/ADMIN, session-only — an API key can never mint another API key
 // (no `scope` option here at all), so key management itself isn't part of
 // the scope system it governs.
-export const GET = withAuthedJson(null, async () => {
-  const keys = await listApiKeys();
+export const GET = withAuthedJson(null, async ({ session }) => {
+  const keys = await listApiKeys(session.user.organizationId);
   return NextResponse.json(keys);
 }, { roles: ["OWNER", "ADMIN"] });
 
 export const POST = withAuthedJson(
   createApiKeySchema,
   async ({ session, body }) => {
-    const key = await createApiKey(body, session.user.id);
+    const key = await createApiKey(body, session.user.id, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "api_key.created",
       entityType: "ApiKey",

@@ -31,17 +31,23 @@ describe("reserveInvoiceNumber concurrency", () => {
   const prefix = "VTEST";
   const format = "{prefix}-{fy}-{seq}";
 
+  async function getOrganizationId(): Promise<string> {
+    const org = await db.organization.findFirstOrThrow();
+    return org.id;
+  }
+
   afterEach(async () => {
     await db.invoiceNumberCounter.deleteMany({ where: { prefix } });
   });
 
   it("assigns unique, gapless sequential numbers to N concurrent reservations", async () => {
+    const organizationId = await getOrganizationId();
     const issueDate = new Date("2026-09-15");
     const concurrency = 20;
 
     const results = await Promise.all(
       Array.from({ length: concurrency }, () =>
-        db.$transaction((tx) => reserveInvoiceNumber(tx, { prefix, format, issueDate })),
+        db.$transaction((tx) => reserveInvoiceNumber(tx, { organizationId, prefix, format, issueDate })),
       ),
     );
 
@@ -52,9 +58,10 @@ describe("reserveInvoiceNumber concurrency", () => {
   });
 
   it("keeps separate counters per financial year", async () => {
+    const organizationId = await getOrganizationId();
     const [inFy2025, inFy2026] = await Promise.all([
-      db.$transaction((tx) => reserveInvoiceNumber(tx, { prefix, format, issueDate: new Date("2026-02-01") })),
-      db.$transaction((tx) => reserveInvoiceNumber(tx, { prefix, format, issueDate: new Date("2026-09-01") })),
+      db.$transaction((tx) => reserveInvoiceNumber(tx, { organizationId, prefix, format, issueDate: new Date("2026-02-01") })),
+      db.$transaction((tx) => reserveInvoiceNumber(tx, { organizationId, prefix, format, issueDate: new Date("2026-09-01") })),
     ]);
     expect(inFy2025).toBe("VTEST-2025-0001");
     expect(inFy2026).toBe("VTEST-2026-0001");

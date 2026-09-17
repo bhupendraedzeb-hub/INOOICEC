@@ -18,8 +18,12 @@ export class OverpaymentError extends Error {}
 // (vs. it already being PAID, or landing somewhere else) — that's the
 // signal for firing the Phase 15 "payment.completed" event exactly once per
 // transition, not on every write while already paid.
-export async function recomputeInvoicePaymentState(tx: Prisma.TransactionClient, invoiceId: string) {
-  const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: invoiceId } });
+export async function recomputeInvoicePaymentState(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  invoiceId: string,
+) {
+  const invoice = await tx.invoice.findFirstOrThrow({ where: { id: invoiceId, organizationId } });
   const activePayments = await tx.payment.findMany({ where: { invoiceId, isVoided: false } });
   const paidTotal = sumMoney(activePayments.map((p) => new Money(p.amount.toString())));
   const grandTotal = new Money(invoice.grandTotal.toString());
@@ -50,20 +54,20 @@ async function enqueuePaymentCompletedIfJust(
   });
 }
 
-export async function listPayments(opts: { invoiceId?: string }) {
+export async function listPayments(organizationId: string, opts: { invoiceId?: string }) {
   return db.payment.findMany({
-    where: opts.invoiceId ? { invoiceId: opts.invoiceId } : {},
+    where: { organizationId, ...(opts.invoiceId ? { invoiceId: opts.invoiceId } : {}) },
     orderBy: { paymentDate: "desc" },
   });
 }
 
-export async function getPayment(id: string) {
-  return db.payment.findUnique({ where: { id } });
+export async function getPayment(id: string, organizationId: string) {
+  return db.payment.findFirst({ where: { id, organizationId } });
 }
 
-export async function createPayment(input: CreatePaymentInput, actorId: string) {
+export async function createPayment(input: CreatePaymentInput, actorId: string, organizationId: string) {
   const result = await db.$transaction(async (tx) => {
-    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: input.invoiceId } });
+    const invoice = await tx.invoice.findFirstOrThrow({ where: { id: input.invoiceId, organizationId } });
     const activePayments = await tx.payment.findMany({
       where: { invoiceId: input.invoiceId, isVoided: false },
     });
@@ -75,6 +79,7 @@ export async function createPayment(input: CreatePaymentInput, actorId: string) 
 
     const payment = await tx.payment.create({
       data: {
+        organizationId,
         invoiceId: input.invoiceId,
         amount: input.amount,
         paymentDate: new Date(input.paymentDate),
@@ -84,7 +89,7 @@ export async function createPayment(input: CreatePaymentInput, actorId: string) 
         createdById: actorId,
       },
     });
-    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, input.invoiceId);
+    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, organizationId, input.invoiceId);
     return { payment, updatedInvoice, justCompleted };
   });
 
@@ -97,10 +102,10 @@ export async function createPayment(input: CreatePaymentInput, actorId: string) 
   return result.payment;
 }
 
-export async function updatePayment(id: string, input: UpdatePaymentInput) {
+export async function updatePayment(id: string, organizationId: string, input: UpdatePaymentInput) {
   const result = await db.$transaction(async (tx) => {
-    const existing = await tx.payment.findUniqueOrThrow({ where: { id } });
-    const invoice = await tx.invoice.findUniqueOrThrow({ where: { id: existing.invoiceId } });
+    const existing = await tx.payment.findFirstOrThrow({ where: { id, organizationId } });
+    const invoice = await tx.invoice.findFirstOrThrow({ where: { id: existing.invoiceId, organizationId } });
     const otherActivePayments = await tx.payment.findMany({
       where: { invoiceId: existing.invoiceId, isVoided: false, id: { not: id } },
     });
@@ -120,7 +125,7 @@ export async function updatePayment(id: string, input: UpdatePaymentInput) {
         notes: input.notes || null,
       },
     });
-    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, existing.invoiceId);
+    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, organizationId, existing.invoiceId);
     return { payment, updatedInvoice, justCompleted };
   });
 
@@ -134,14 +139,14 @@ export async function updatePayment(id: string, input: UpdatePaymentInput) {
 }
 
 // Voided, never deleted — a financial record (plan.md).
-export async function voidPayment(id: string, reason: string) {
+export async function voidPayment(id: string, organizationId: string, reason: string) {
   const result = await db.$transaction(async (tx) => {
-    const existing = await tx.payment.findUniqueOrThrow({ where: { id } });
+    const existing = await tx.payment.findFirstOrThrow({ where: { id, organizationId } });
     const payment = await tx.payment.update({
       where: { id },
       data: { isVoided: true, voidedAt: new Date(), voidedReason: reason },
     });
-    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, existing.invoiceId);
+    const { invoice: updatedInvoice, justCompleted } = await recomputeInvoicePaymentState(tx, organizationId, existing.invoiceId);
     return { payment, updatedInvoice, justCompleted };
   });
 

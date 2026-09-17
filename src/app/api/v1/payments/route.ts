@@ -7,9 +7,9 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson(
   null,
-  async ({ request }) => {
+  async ({ request, session }) => {
     const invoiceId = request.nextUrl.searchParams.get("invoiceId") ?? undefined;
-    const payments = await listPayments({ invoiceId });
+    const payments = await listPayments(session.user.organizationId, { invoiceId });
     return NextResponse.json(payments);
   },
   { scope: "payments:read" },
@@ -18,13 +18,14 @@ export const GET = withAuthedJson(
 export const POST = withAuthedJson(
   createPaymentSchema,
   async ({ session, body }) => {
-    const invoice = await getInvoice(body.invoiceId);
+    const invoice = await getInvoice(body.invoiceId, session.user.organizationId);
     if (!invoice) throw new ApiError(404, "Invoice not found");
     if (invoice.status !== "ISSUED") throw new ApiError(409, "Payments can only be recorded against issued invoices");
 
     try {
-      const payment = await createPayment(body, session.user.id);
+      const payment = await createPayment(body, session.user.id, session.user.organizationId);
       await writeAuditEvent({
+        organizationId: session.user.organizationId,
         actorId: session.user.id,
         action: "payment.created",
         entityType: "Payment",

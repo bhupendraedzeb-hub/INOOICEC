@@ -6,8 +6,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const product = await getProduct(params.id);
+  async ({ session, params }) => {
+    const product = await getProduct(params.id, session.user.organizationId);
     if (!product) throw new ApiError(404, "Product not found");
     return NextResponse.json(product);
   },
@@ -17,10 +17,11 @@ export const GET = withAuthedJson<undefined, { id: string }>(
 export const PUT = withAuthedJson<ProductInput, { id: string }>(
   productSchema,
   async ({ session, body, params }) => {
-    const existing = await getProduct(params.id);
+    const existing = await getProduct(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Product not found");
-    const product = await updateProduct(params.id, body);
+    const product = await updateProduct(params.id, session.user.organizationId, body);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "product.updated",
       entityType: "Product",

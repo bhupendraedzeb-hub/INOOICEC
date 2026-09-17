@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth/auth";
 import { getTemplate, getLatestVersion } from "@/lib/services/templates";
 import { TemplateForm } from "@/components/templates/TemplateForm";
 import { TemplateActions } from "@/components/templates/TemplateActions";
@@ -9,10 +10,11 @@ export default async function EditTemplatePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
   const { id } = await params;
-  const template = await getTemplate(id);
+  const template = await getTemplate(id, session!.user.organizationId);
   if (!template) notFound();
-  const latestVersion = await getLatestVersion(id);
+  const latestVersion = await getLatestVersion(id, session!.user.organizationId);
 
   return (
     <div className="max-w-xl">

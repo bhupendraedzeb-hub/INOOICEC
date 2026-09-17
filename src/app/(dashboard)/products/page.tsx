@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth/auth";
 import { listProducts } from "@/lib/services/products";
 
 export default async function ProductsPage({
@@ -6,8 +7,9 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<{ q?: string; includeArchived?: string }>;
 }) {
+  const session = await auth();
   const { q, includeArchived } = await searchParams;
-  const products = await listProducts({ q, includeArchived: includeArchived === "true" });
+  const products = await listProducts(session!.user.organizationId, { q, includeArchived: includeArchived === "true" });
 
   return (
     <div>

@@ -6,7 +6,7 @@ import { ApiKeyList } from "@/components/settings/ApiKeyList";
 export default async function ApiKeysPage() {
   const session = await auth();
   const canManage = session?.user.role === "OWNER" || session?.user.role === "ADMIN";
-  const keys = await listApiKeys();
+  const keys = await listApiKeys(session!.user.organizationId);
 
   return (
     <div className="max-w-3xl">

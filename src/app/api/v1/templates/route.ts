@@ -6,10 +6,10 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson(
   null,
-  async ({ request }) => {
+  async ({ request, session }) => {
     const q = request.nextUrl.searchParams.get("q") ?? undefined;
     const status = request.nextUrl.searchParams.get("status") ?? undefined;
-    const templates = await listTemplates({ q, status });
+    const templates = await listTemplates(session.user.organizationId, { q, status });
     return NextResponse.json(templates);
   },
   { scope: "templates:read" },
@@ -18,8 +18,9 @@ export const GET = withAuthedJson(
 export const POST = withAuthedJson(
   templateMetadataSchema,
   async ({ session, body }) => {
-    const template = await createTemplate(body, session.user.id);
+    const template = await createTemplate(body, session.user.id, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "template.created",
       entityType: "Template",

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth/auth";
 import { getProduct } from "@/lib/services/products";
 import { ProductForm } from "@/components/products/ProductForm";
 
@@ -7,8 +8,9 @@ export default async function EditProductPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
   const { id } = await params;
-  const product = await getProduct(id);
+  const product = await getProduct(id, session!.user.organizationId);
   if (!product) notFound();
 
   return (

@@ -24,12 +24,14 @@ function formatInvoiceNumber(format: string, prefix: string, financialYear: stri
 // needed.
 export async function reserveInvoiceNumber(
   tx: Prisma.TransactionClient,
-  opts: { prefix: string; format: string; issueDate: Date },
+  opts: { organizationId: string; prefix: string; format: string; issueDate: Date },
 ): Promise<string> {
   const financialYear = financialYearLabel(opts.issueDate);
   const counter = await tx.invoiceNumberCounter.upsert({
-    where: { prefix_financialYear: { prefix: opts.prefix, financialYear } },
-    create: { prefix: opts.prefix, financialYear, lastSequence: 1 },
+    where: {
+      organizationId_prefix_financialYear: { organizationId: opts.organizationId, prefix: opts.prefix, financialYear },
+    },
+    create: { organizationId: opts.organizationId, prefix: opts.prefix, financialYear, lastSequence: 1 },
     update: { lastSequence: { increment: 1 } },
   });
   return formatInvoiceNumber(opts.format, opts.prefix, financialYear, counter.lastSequence);

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth/auth";
 import { listTemplates } from "@/lib/services/templates";
 
 export default async function TemplatesPage({
@@ -6,8 +7,9 @@ export default async function TemplatesPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
+  const session = await auth();
   const { q, status } = await searchParams;
-  const templates = await listTemplates({ q, status });
+  const templates = await listTemplates(session!.user.organizationId, { q, status });
 
   return (
     <div>

@@ -6,8 +6,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const versions = await listVersions(params.id);
+  async ({ session, params }) => {
+    const versions = await listVersions(params.id, session.user.organizationId);
     return NextResponse.json(versions);
   },
   { scope: "templates:read" },
@@ -20,10 +20,11 @@ export const GET = withAuthedJson<undefined, { id: string }>(
 export const POST = withAuthedJson<CreateVersionInput, { id: string }>(
   createVersionSchema,
   async ({ session, body, params }) => {
-    const template = await getTemplate(params.id);
+    const template = await getTemplate(params.id, session.user.organizationId);
     if (!template) throw new ApiError(404, "Template not found");
-    const version = await createTemplateVersion(params.id, body.layout, session.user.id);
+    const version = await createTemplateVersion(params.id, session.user.organizationId, body.layout, session.user.id);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "template.version_created",
       entityType: "TemplateVersion",

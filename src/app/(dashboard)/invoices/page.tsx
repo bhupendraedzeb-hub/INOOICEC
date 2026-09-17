@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth/auth";
 import { listInvoices } from "@/lib/services/invoices";
 import { Badge } from "@/components/invoices/StatusBadge";
 import { parseEnumParam } from "@/lib/validation/enumParam";
@@ -11,8 +12,9 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; paymentStatus?: string }>;
 }) {
+  const session = await auth();
   const { q, status, paymentStatus } = await searchParams;
-  const invoices = await listInvoices({
+  const invoices = await listInvoices(session!.user.organizationId, {
     q,
     status: parseEnumParam(status ?? null, INVOICE_STATUSES),
     paymentStatus: parseEnumParam(paymentStatus ?? null, PAYMENT_STATUSES),

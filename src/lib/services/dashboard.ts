@@ -17,8 +17,8 @@ export type DashboardSummary = {
 // table below would show, so the cards and the filtered table never
 // disagree. Goes through listInvoices (not a raw query) so the OVERDUE
 // column sync (syncOverdueInvoices) always runs first.
-export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const invoices = await listInvoices({ status: "ISSUED" });
+export async function getDashboardSummary(organizationId: string): Promise<DashboardSummary> {
+  const invoices = await listInvoices(organizationId, { status: "ISSUED" });
 
   const byStatus = (status: string) => invoices.filter((i) => i.paymentStatus === status);
 

@@ -6,15 +6,16 @@ function generateSigningSecret(): string {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-export async function listWebhookEndpoints() {
+export async function listWebhookEndpoints(organizationId: string) {
   return db.webhookEndpoint.findMany({
+    where: { organizationId },
     include: { createdBy: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function getWebhookEndpoint(id: string) {
-  return db.webhookEndpoint.findUnique({ where: { id } });
+export async function getWebhookEndpoint(id: string, organizationId: string) {
+  return db.webhookEndpoint.findFirst({ where: { id, organizationId } });
 }
 
 // Unlike ApiKey's hashed secret, the signing secret is stored in plaintext
@@ -23,9 +24,10 @@ export async function getWebhookEndpoint(id: string) {
 // needs to reference it when configuring/debugging signature verification
 // on the receiving side. Session-only, OWNER/ADMIN-gated at the route
 // layer, same as ApiKey management.
-export async function createWebhookEndpoint(input: CreateWebhookEndpointInput, actorId: string) {
+export async function createWebhookEndpoint(input: CreateWebhookEndpointInput, actorId: string, organizationId: string) {
   return db.webhookEndpoint.create({
     data: {
+      organizationId,
       url: input.url,
       label: input.label || null,
       events: input.events,
@@ -35,7 +37,8 @@ export async function createWebhookEndpoint(input: CreateWebhookEndpointInput, a
   });
 }
 
-export async function updateWebhookEndpoint(id: string, input: UpdateWebhookEndpointInput) {
+export async function updateWebhookEndpoint(id: string, organizationId: string, input: UpdateWebhookEndpointInput) {
+  await db.webhookEndpoint.findFirstOrThrow({ where: { id, organizationId } });
   return db.webhookEndpoint.update({
     where: { id },
     data: { url: input.url, label: input.label || null, events: input.events, isActive: input.isActive },

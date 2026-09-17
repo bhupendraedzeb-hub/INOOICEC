@@ -6,8 +6,16 @@ test.describe("Invoice API", () => {
   let templateId: string;
 
   test.beforeAll(async ({ request }) => {
+    // Same-state vs. inter-state GST depends on the customer's stateCode
+    // matching the real company's own stateCode (live, user-editable Company
+    // Settings data — not something this test suite should assume a fixed
+    // value for, or reset). Read it and match it, rather than hardcoding
+    // "06" and hoping the live company happens to be registered there too.
+    const company = await (await request.get("/api/v1/settings/company")).json();
+    const sameStateCode = company.stateCode ?? "06";
+
     const customer = await request.post("/api/v1/customers", {
-      data: { name: `${TEST_PREFIX} Invoices Co`, state: "Haryana", stateCode: "06" },
+      data: { name: `${TEST_PREFIX} Invoices Co`, state: "Same State", stateCode: sameStateCode },
     });
     expect(customer.ok()).toBe(true);
     customerId = (await customer.json()).id;

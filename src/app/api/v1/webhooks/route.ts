@@ -29,8 +29,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const payment = await recordWebhookPayment(parsed.data);
+    const { payment, organizationId } = await recordWebhookPayment(parsed.data);
     await writeAuditEvent({
+      organizationId,
       actorId: null,
       action: "payment_link.webhook_received",
       entityType: "PaymentLink",

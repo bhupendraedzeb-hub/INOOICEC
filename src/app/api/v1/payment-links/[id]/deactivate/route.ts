@@ -6,12 +6,13 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 export const POST = withAuthedJson<undefined, { id: string }>(
   null,
   async ({ session, params }) => {
-    const existing = await getPaymentLink(params.id);
+    const existing = await getPaymentLink(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Payment link not found");
 
     try {
-      const link = await deactivatePaymentLink(params.id);
+      const link = await deactivatePaymentLink(params.id, session.user.organizationId);
       await writeAuditEvent({
+        organizationId: session.user.organizationId,
         actorId: session.user.id,
         action: "payment_link.deactivated",
         entityType: "PaymentLink",

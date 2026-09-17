@@ -7,22 +7,23 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson(
   null,
-  async ({ request }) => {
+  async ({ request, session }) => {
     const invoiceId = request.nextUrl.searchParams.get("invoiceId") ?? undefined;
-    const links = await listPaymentLinks({ invoiceId });
+    const links = await listPaymentLinks(session.user.organizationId, { invoiceId });
     return NextResponse.json(links);
   },
   { scope: "payment_links:read" },
 );
 
 export const POST = withAuthedJson(createPaymentLinkSchema, async ({ session, body }) => {
-  const invoice = await getInvoice(body.invoiceId);
+  const invoice = await getInvoice(body.invoiceId, session.user.organizationId);
   if (!invoice) throw new ApiError(404, "Invoice not found");
   if (invoice.status !== "ISSUED") throw new ApiError(409, "Payment links can only be created for issued invoices");
 
   try {
-    const link = await createPaymentLink(body, session.user.id);
+    const link = await createPaymentLink(body, session.user.id, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "payment_link.created",
       entityType: "PaymentLink",

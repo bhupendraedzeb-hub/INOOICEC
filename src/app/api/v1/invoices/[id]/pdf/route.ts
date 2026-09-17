@@ -9,8 +9,8 @@ import { renderInvoicePdf } from "@/lib/pdf/printInvoice";
 // the on-screen preview.
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const invoice = await getInvoice(params.id);
+  async ({ session, params }) => {
+    const invoice = await getInvoice(params.id, session.user.organizationId);
     if (!invoice) throw new ApiError(404, "Invoice not found");
 
     const pdf = await renderInvoicePdf(params.id);

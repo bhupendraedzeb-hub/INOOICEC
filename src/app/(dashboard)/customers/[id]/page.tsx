@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth/auth";
 import { getCustomer } from "@/lib/services/customers";
 import { CustomerForm } from "@/components/customers/CustomerForm";
 
@@ -7,8 +8,9 @@ export default async function EditCustomerPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
   const { id } = await params;
-  const customer = await getCustomer(id);
+  const customer = await getCustomer(id, session!.user.organizationId);
   if (!customer) notFound();
 
   return (

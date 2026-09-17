@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth/auth";
 import { getTemplate, listVersions } from "@/lib/services/templates";
 
 export default async function TemplateVersionsPage({
@@ -7,10 +8,11 @@ export default async function TemplateVersionsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
   const { id } = await params;
-  const template = await getTemplate(id);
+  const template = await getTemplate(id, session!.user.organizationId);
   if (!template) notFound();
-  const versions = await listVersions(id);
+  const versions = await listVersions(id, session!.user.organizationId);
 
   return (
     <div className="max-w-2xl">

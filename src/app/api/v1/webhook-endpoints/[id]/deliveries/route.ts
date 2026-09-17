@@ -5,10 +5,10 @@ import { listWebhookDeliveries } from "@/lib/services/webhookDeliveries";
 
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const endpoint = await getWebhookEndpoint(params.id);
+  async ({ session, params }) => {
+    const endpoint = await getWebhookEndpoint(params.id, session.user.organizationId);
     if (!endpoint) throw new ApiError(404, "Webhook endpoint not found");
-    const deliveries = await listWebhookDeliveries({ endpointId: params.id });
+    const deliveries = await listWebhookDeliveries(session.user.organizationId, { endpointId: params.id });
     return NextResponse.json(deliveries);
   },
   { roles: ["OWNER", "ADMIN"] },

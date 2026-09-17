@@ -36,6 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           role: user.role,
           tokenVersion: user.tokenVersion,
+          organizationId: user.organizationId,
         };
       },
     }),
@@ -46,6 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.uid = user.id;
         token.role = user.role;
         token.tokenVersion = user.tokenVersion;
+        token.organizationId = user.organizationId;
       }
       // Re-validate on every request: if the account was deactivated or its
       // tokenVersion was bumped (revocation), drop the claims so `session()`
@@ -53,12 +55,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.uid) {
         const current = await db.user.findUnique({
           where: { id: token.uid as string },
-          select: { isActive: true, tokenVersion: true, role: true },
+          select: { isActive: true, tokenVersion: true, role: true, organizationId: true },
         });
         if (!current || !current.isActive || current.tokenVersion !== token.tokenVersion) {
           return {};
         }
         token.role = current.role;
+        token.organizationId = current.organizationId;
       }
       return token;
     },
@@ -66,14 +69,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.uid) {
         session.user.id = token.uid as string;
         session.user.role = token.role as string;
+        session.user.organizationId = token.organizationId as string;
       }
       return session;
     },
   },
   events: {
     async signIn({ user }) {
-      if (!user.id) return;
+      if (!user.id || !user.organizationId) return;
       await writeAuditEvent({
+        organizationId: user.organizationId,
         actorId: user.id,
         action: "user.signed_in",
         entityType: "User",

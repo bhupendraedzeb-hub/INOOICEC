@@ -6,8 +6,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson(
   null,
-  async () => {
-    const settings = await getCompanySettings();
+  async ({ session }) => {
+    const settings = await getCompanySettings(session.user.organizationId);
     return NextResponse.json(settings);
   },
   { scope: "settings:read" },
@@ -16,8 +16,9 @@ export const GET = withAuthedJson(
 export const PUT = withAuthedJson(
   companySettingsSchema,
   async ({ session, body }) => {
-    const settings = await updateCompanySettings(body);
+    const settings = await updateCompanySettings(session.user.organizationId, body);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "company_settings.updated",
       entityType: "CompanySettings",

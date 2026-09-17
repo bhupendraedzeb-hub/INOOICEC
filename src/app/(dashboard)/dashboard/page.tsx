@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth/auth";
 import { getDashboardSummary } from "@/lib/services/dashboard";
 import { listInvoices } from "@/lib/services/invoices";
 import { Badge } from "@/components/invoices/StatusBadge";
@@ -30,6 +31,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
+  const session = await auth();
   const { filter } = await searchParams;
   const active = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
 
@@ -37,8 +39,8 @@ export default async function DashboardPage({
   // (syncOverdueInvoices) always runs before either the cards or the table
   // below are computed — the two can never disagree about what's overdue.
   const [summary, invoices] = await Promise.all([
-    getDashboardSummary(),
-    listInvoices({ ...active.query, limit: 20 }),
+    getDashboardSummary(session!.user.organizationId),
+    listInvoices(session!.user.organizationId, { ...active.query, limit: 20 }),
   ]);
 
   return (

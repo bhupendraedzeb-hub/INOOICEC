@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/lib/auth/auth";
 import { listCustomers } from "@/lib/services/customers";
 
 export default async function CustomersPage({
@@ -6,8 +7,9 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ q?: string; includeArchived?: string }>;
 }) {
+  const session = await auth();
   const { q, includeArchived } = await searchParams;
-  const customers = await listCustomers({ q, includeArchived: includeArchived === "true" });
+  const customers = await listCustomers(session!.user.organizationId, { q, includeArchived: includeArchived === "true" });
 
   return (
     <div>

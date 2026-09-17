@@ -47,7 +47,17 @@ export async function resolveRequestAuth(request: NextRequest): Promise<Resolved
         // tokenVersion is a JWT-revocation field (see next-auth.d.ts's
         // User augmentation) that only matters for browser sessions — 0 is
         // an unused placeholder here, never read for an API-key actor.
-        user: { id: actor.id, name: actor.name, email: actor.email, role: actor.role, tokenVersion: 0 },
+        // organizationId is read from the key itself, not the creator, so a
+        // key keeps working correctly even if its creator later leaves the
+        // organization.
+        user: {
+          id: actor.id,
+          name: actor.name,
+          email: actor.email,
+          role: actor.role,
+          tokenVersion: 0,
+          organizationId: candidate.organizationId,
+        },
         expires: new Date(Date.now() + 60_000).toISOString(),
       };
       return { kind: "apiKey", session: synthetic, scopes: candidate.scopes, apiKeyId: candidate.id };

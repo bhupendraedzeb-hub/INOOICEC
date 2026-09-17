@@ -10,9 +10,9 @@ const PAYMENT_STATUSES = ["UNPAID", "PARTIALLY_PAID", "PAID", "OVERDUE"] as cons
 
 export const GET = withAuthedJson(
   null,
-  async ({ request }) => {
+  async ({ request, session }) => {
     const params = request.nextUrl.searchParams;
-    const invoices = await listInvoices({
+    const invoices = await listInvoices(session.user.organizationId, {
       q: params.get("q") ?? undefined,
       status: parseEnumParam(params.get("status"), INVOICE_STATUSES),
       paymentStatus: parseEnumParam(params.get("paymentStatus"), PAYMENT_STATUSES),
@@ -26,8 +26,9 @@ export const GET = withAuthedJson(
 export const POST = withAuthedJson(
   invoiceInputSchema,
   async ({ session, body }) => {
-    const invoice = await createInvoiceDraft(body, session.user.id);
+    const invoice = await createInvoiceDraft(body, session.user.id, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "invoice.created",
       entityType: "Invoice",

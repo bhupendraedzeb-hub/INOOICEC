@@ -6,8 +6,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const customer = await getCustomer(params.id);
+  async ({ session, params }) => {
+    const customer = await getCustomer(params.id, session.user.organizationId);
     if (!customer) throw new ApiError(404, "Customer not found");
     return NextResponse.json(customer);
   },
@@ -17,10 +17,11 @@ export const GET = withAuthedJson<undefined, { id: string }>(
 export const PUT = withAuthedJson<CustomerInput, { id: string }>(
   customerSchema,
   async ({ session, body, params }) => {
-    const existing = await getCustomer(params.id);
+    const existing = await getCustomer(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Customer not found");
-    const customer = await updateCustomer(params.id, body);
+    const customer = await updateCustomer(params.id, session.user.organizationId, body);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "customer.updated",
       entityType: "Customer",

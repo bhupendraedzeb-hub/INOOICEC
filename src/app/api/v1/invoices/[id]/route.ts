@@ -6,8 +6,8 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 
 export const GET = withAuthedJson<undefined, { id: string }>(
   null,
-  async ({ params }) => {
-    const invoice = await getInvoice(params.id);
+  async ({ session, params }) => {
+    const invoice = await getInvoice(params.id, session.user.organizationId);
     if (!invoice) throw new ApiError(404, "Invoice not found");
     return NextResponse.json(invoice);
   },
@@ -17,12 +17,13 @@ export const GET = withAuthedJson<undefined, { id: string }>(
 export const PUT = withAuthedJson<InvoiceInput, { id: string }>(
   invoiceInputSchema,
   async ({ session, body, params }) => {
-    const existing = await getInvoice(params.id);
+    const existing = await getInvoice(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Invoice not found");
     if (existing.status !== "DRAFT") throw new ApiError(409, "Only draft invoices can be edited");
 
-    const invoice = await updateInvoiceDraft(params.id, body);
+    const invoice = await updateInvoiceDraft(params.id, session.user.organizationId, body);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "invoice.updated",
       entityType: "Invoice",
@@ -39,12 +40,13 @@ export const PUT = withAuthedJson<InvoiceInput, { id: string }>(
 export const DELETE = withAuthedJson<undefined, { id: string }>(
   null,
   async ({ session, params }) => {
-    const existing = await getInvoice(params.id);
+    const existing = await getInvoice(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Invoice not found");
     if (existing.status !== "DRAFT") throw new ApiError(409, "Only draft invoices can be deleted — cancel issued invoices instead");
 
-    await deleteDraftInvoice(params.id);
+    await deleteDraftInvoice(params.id, session.user.organizationId);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "invoice.deleted",
       entityType: "Invoice",

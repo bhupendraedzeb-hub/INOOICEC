@@ -28,6 +28,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/settings/company" className="hover:text-zinc-950 dark:hover:text-zinc-50">
             Company Settings
           </Link>
+          <Link href="/settings/users" className="hover:text-zinc-950 dark:hover:text-zinc-50">
+            Team
+          </Link>
           <Link href="/settings/api-keys" className="hover:text-zinc-950 dark:hover:text-zinc-50">
             API Keys
           </Link>

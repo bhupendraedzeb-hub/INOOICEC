@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth/auth";
 import { listTemplates } from "@/lib/services/templates";
 import { listCustomers } from "@/lib/services/customers";
 import { listProducts } from "@/lib/services/products";
@@ -5,11 +6,13 @@ import { getCompanySettings } from "@/lib/services/companySettings";
 import { InvoiceForm } from "@/components/invoices/InvoiceForm";
 
 export default async function NewInvoicePage() {
+  const session = await auth();
+  const organizationId = session!.user.organizationId;
   const [templates, customers, products, company] = await Promise.all([
-    listTemplates({}),
-    listCustomers({}),
-    listProducts({}),
-    getCompanySettings(),
+    listTemplates(organizationId, {}),
+    listCustomers(organizationId, {}),
+    listProducts(organizationId, {}),
+    getCompanySettings(organizationId),
   ]);
 
   return (

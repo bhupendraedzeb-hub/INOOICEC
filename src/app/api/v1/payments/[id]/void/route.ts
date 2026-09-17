@@ -8,12 +8,13 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 export const POST = withAuthedJson<VoidPaymentInput, { id: string }>(
   voidPaymentSchema,
   async ({ session, body, params }) => {
-    const existing = await getPayment(params.id);
+    const existing = await getPayment(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Payment not found");
     if (existing.isVoided) throw new ApiError(409, "Payment is already voided");
 
-    const payment = await voidPayment(params.id, body.reason);
+    const payment = await voidPayment(params.id, session.user.organizationId, body.reason);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "payment.voided",
       entityType: "Payment",

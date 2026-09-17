@@ -2,8 +2,9 @@ import { db } from "@/lib/db";
 import { generateApiKeySecret, hashApiKeySecret } from "@/lib/auth/apiKeyAuth";
 import type { CreateApiKeyInput } from "@/lib/validation/schemas/apiKey";
 
-export async function listApiKeys() {
+export async function listApiKeys(organizationId: string) {
   return db.apiKey.findMany({
+    where: { organizationId },
     select: {
       id: true,
       label: true,
@@ -18,8 +19,8 @@ export async function listApiKeys() {
   });
 }
 
-export async function getApiKey(id: string) {
-  return db.apiKey.findUnique({ where: { id } });
+export async function getApiKey(id: string, organizationId: string) {
+  return db.apiKey.findFirst({ where: { id, organizationId } });
 }
 
 // The plaintext secret is generated, hashed, and returned here — this is
@@ -29,18 +30,19 @@ export async function getApiKey(id: string) {
 // The returned object deliberately omits `hashedKey` — even though it's a
 // hash, not the secret itself, there's no reason for it to ever leave the
 // DB, including in this one-time creation response.
-export async function createApiKey(input: CreateApiKeyInput, actorId: string) {
+export async function createApiKey(input: CreateApiKeyInput, actorId: string, organizationId: string) {
   const { plaintext, prefix } = generateApiKeySecret();
   const hashedKey = await hashApiKeySecret(plaintext);
 
   const key = await db.apiKey.create({
-    data: { label: input.label, scopes: input.scopes, prefix, hashedKey, createdById: actorId },
+    data: { organizationId, label: input.label, scopes: input.scopes, prefix, hashedKey, createdById: actorId },
     select: { id: true, label: true, prefix: true, scopes: true, createdAt: true, createdById: true },
   });
 
   return { ...key, plaintext };
 }
 
-export async function revokeApiKey(id: string) {
+export async function revokeApiKey(id: string, organizationId: string) {
+  await db.apiKey.findFirstOrThrow({ where: { id, organizationId } });
   return db.apiKey.update({ where: { id }, data: { revokedAt: new Date() } });
 }

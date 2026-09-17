@@ -17,6 +17,34 @@ datasource db {
 // (Customer/Product/Template/Invoice/Payment/Webhook models land in later phases)
 // ---------------------------------------------------------------------------
 
+// A tenant boundary. Every other business-data model below (company
+// settings, customers, products, templates, invoices, payments, API keys,
+// webhooks, audit logs) hangs off exactly one Organization, and no query
+// anywhere is allowed to cross that boundary — see lib/services/*.ts, which
+// take an organizationId as an explicit required parameter throughout.
+// Deliberately thin: no slug, no billing, no nested sub-orgs — this is
+// tenant data-isolation for a private self-hosted tool, not a SaaS product
+// (see agent/AGENTS.md).
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                 User[]
+  companySettings       CompanySettings?
+  auditLogs             AuditLog[]
+  customers             Customer[]
+  products              Product[]
+  templates             Template[]
+  apiKeys               ApiKey[]
+  invoices              Invoice[]
+  invoiceNumberCounters InvoiceNumberCounter[]
+  payments              Payment[]
+  paymentLinks          PaymentLink[]
+  webhookEndpoints      WebhookEndpoint[]
+}
+
 enum UserRole {
   OWNER
   ADMIN
@@ -24,18 +52,21 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String
-  passwordHash String
-  role         UserRole @default(STAFF)
-  isActive     Boolean  @default(true)
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String   @unique
+  name           String
+  passwordHash   String
+  role           UserRole @default(STAFF)
+  isActive       Boolean  @default(true)
   // Bumped to invalidate all outstanding JWT sessions for this user (revocation
   // substitute — Auth.js v5 rejects `session.strategy = "database"` for a
   // credentials-only provider set, so sessions are JWT-based; see auth.ts).
   tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   accounts                Account[]
   sessions                Session[]
@@ -47,6 +78,8 @@ model User {
   recordedPayments        Payment[]
   createdPaymentLinks     PaymentLink[]
   createdWebhookEndpoints WebhookEndpoint[]
+
+  @@index([organizationId])
 }
 
 // NextAuth.js (Auth.js) v5 required models — Prisma adapter, database sessions.
@@ -86,11 +119,14 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// Singleton row (one CompanySettings record per deployment).
+// One CompanySettings record per Organization (organizationId unique below
+// enforces this — previously a per-deployment singleton with no DB-level
+// constraint at all, before multi-tenancy).
 model CompanySettings {
-  id      String  @id @default(cuid())
-  name    String
-  logoUrl String?
+  id             String @id @default(cuid())
+  organizationId String @unique
+  name           String
+  logoUrl        String?
 
   addressLine1 String?
   addressLine2 String?
@@ -121,19 +157,28 @@ model CompanySettings {
   defaultTerms        String?
 
   updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
 }
 
+// actorId is nullable (the inbound gateway webhook receiver writes audit
+// events with no session actor), so organizationId can't be derived from
+// the actor — every writeAuditEvent() call site passes it explicitly,
+// sourced from the entity being acted on.
 model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String?
+  id             String  @id @default(cuid())
+  organizationId String
+  actorId        String?
   action     String // e.g. "invoice.issued", "payment.voided", "template.version_created"
   entityType String // "Invoice", "Payment", "Template", ...
   entityId   String
   metadata   Json?
   createdAt  DateTime @default(now())
 
-  actor User? @relation(fields: [actorId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  actor        User?        @relation(fields: [actorId], references: [id])
 
+  @@index([organizationId])
   @@index([entityType, entityId])
   @@index([createdAt])
 }
@@ -144,6 +189,7 @@ model AuditLog {
 
 model Customer {
   id              String  @id @default(cuid())
+  organizationId  String
   name            String
   companyName     String?
   gstin           String?
@@ -159,24 +205,30 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoices Invoice[]
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invoices     Invoice[]
 
+  @@index([organizationId])
   @@index([name])
 }
 
 model Product {
-  id          String  @id @default(cuid())
-  name        String
-  description String?
-  hsnSac      String?
-  defaultRate Decimal @db.Decimal(14, 2)
-  gstRate     Decimal @db.Decimal(5, 2)
-  unit        String?
-  isArchived  Boolean @default(false)
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  hsnSac         String?
+  defaultRate    Decimal @db.Decimal(14, 2)
+  gstRate        Decimal @db.Decimal(5, 2)
+  unit           String?
+  isArchived     Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
   @@index([name])
 }
 
@@ -191,12 +243,16 @@ enum TemplateStatus {
 }
 
 model Template {
-  id           String         @id @default(cuid())
-  name         String
-  description  String?
-  thumbnailUrl String?
-  status       TemplateStatus @default(DRAFT)
-  isDefault    Boolean        @default(false)
+  id             String         @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  thumbnailUrl   String?
+  status         TemplateStatus @default(DRAFT)
+  // Per-organization default — createTemplate/updateTemplateMetadata's
+  // "unset every other default" reset must scope by organizationId, or it
+  // would silently unset another organization's default template.
+  isDefault Boolean @default(false)
 
   createdById String
   updatedById String?
@@ -204,10 +260,12 @@ model Template {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  createdBy User              @relation("TemplateCreatedBy", fields: [createdById], references: [id])
-  versions  TemplateVersion[]
-  invoices  Invoice[]
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  createdBy    User              @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+  versions     TemplateVersion[]
+  invoices     Invoice[]
 
+  @@index([organizationId])
   @@index([status])
 }
 
@@ -233,17 +291,24 @@ model TemplateVersion {
 }
 
 model ApiKey {
-  id          String    @id @default(cuid())
-  label       String
-  hashedKey   String    @unique // argon2 hash of the secret; plaintext shown once on creation only
-  prefix      String // short visible prefix, e.g. "inv_live_ab12", for identification in UI
-  scopes      String[] // e.g. ["invoices:write", "invoices:read", "payments:write"]
-  createdById String
-  lastUsedAt  DateTime?
-  revokedAt   DateTime?
-  createdAt   DateTime  @default(now())
+  id             String @id @default(cuid())
+  organizationId String
+  label          String
+  hashedKey      String    @unique // argon2 hash of the secret; plaintext shown once on creation only
+  prefix         String // short visible prefix, e.g. "inv_live_ab12", for identification in UI
+  scopes         String[] // e.g. ["invoices:write", "invoices:read", "payments:write"]
+  createdById    String
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
 
-  createdBy User @relation(fields: [createdById], references: [id])
+  // Read directly (not derived via createdBy) when resolving an API-key
+  // actor's org, so a key keeps working correctly even if its creator
+  // later leaves the organization — see lib/auth/resolveRequestAuth.ts.
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId])
 }
 
 // ---------------------------------------------------------------------------
@@ -268,17 +333,25 @@ enum PaymentStatus {
 // as INSERT ... ON CONFLICT DO UPDATE, safe under concurrent /issue calls
 // without a separate SELECT ... FOR UPDATE.
 model InvoiceNumberCounter {
-  id            String @id @default(cuid())
-  prefix        String
-  financialYear String
-  lastSequence  Int    @default(0)
+  id             String @id @default(cuid())
+  organizationId String
+  prefix         String
+  financialYear  String
+  lastSequence   Int    @default(0)
 
-  @@unique([prefix, financialYear])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, prefix, financialYear])
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  invoiceNumber String?       @unique // null while DRAFT; assigned only at /issue
+  id             String        @id @default(cuid())
+  organizationId String
+  // null while DRAFT; assigned only at /issue. Scoped per-organization, not
+  // globally unique — every org's numbering starts at its own prefix/FY
+  // sequence (see @@unique below), so two orgs both issuing their first
+  // invoice of the year both get e.g. "INV-2026-0001" without colliding.
+  invoiceNumber String?
   status        InvoiceStatus @default(DRAFT)
   // Cached/derived (lib/calc/gstEngine.ts's derivePaymentStatus), recomputed
   // transactionally on every totals/payment write — never hand-editable, so
@@ -328,10 +401,13 @@ model Invoice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organization Organization  @relation(fields: [organizationId], references: [id])
   items        InvoiceItem[]
   payments     Payment[]
   paymentLinks PaymentLink[]
 
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId])
   @@index([status])
   @@index([paymentStatus])
   @@index([customerId])
@@ -369,7 +445,9 @@ enum PaymentMethod {
 
 model Payment {
   id             String        @id @default(cuid())
+  organizationId String
   invoiceId      String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
   invoice        Invoice       @relation(fields: [invoiceId], references: [id])
   amount         Decimal       @db.Decimal(14, 2)
   paymentDate    DateTime
@@ -399,6 +477,7 @@ model Payment {
   // edits of the same payment — createdAt alone would collide).
   updatedAt   DateTime @updatedAt
 
+  @@index([organizationId])
   @@index([invoiceId])
 }
 
@@ -414,15 +493,19 @@ enum PaymentLinkStatus {
 }
 
 model PaymentLink {
-  id        String            @id @default(cuid())
+  id             String @id @default(cuid())
+  organizationId String
   // Opaque public identifier (e.g. a future /pay/:token page or the value
   // handed to a payment gateway when creating its side of the link) —
   // deliberately not the row id, so the internal cuid never needs to be
-  // exposed to a customer-facing surface.
-  token     String            @unique @default(cuid())
-  invoiceId String
-  invoice   Invoice           @relation(fields: [invoiceId], references: [id])
-  amount    Decimal           @db.Decimal(14, 2)
+  // exposed to a customer-facing surface. Globally unique/unguessable, so
+  // the inbound webhook receiver (no session/org context) can safely use
+  // it alone as the lookup key without an explicit org check.
+  token        String            @unique @default(cuid())
+  invoiceId    String
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  invoice      Invoice           @relation(fields: [invoiceId], references: [id])
+  amount       Decimal           @db.Decimal(14, 2)
   // Free-text gateway label (e.g. "razorpay", "stripe", "manual") — kept
   // generic per plan.md: no vendor-specific fields or hardcoded integrations.
   provider  String
@@ -441,6 +524,7 @@ model PaymentLink {
 
   payments Payment[]
 
+  @@index([organizationId])
   @@index([invoiceId])
 }
 
@@ -449,9 +533,10 @@ model PaymentLink {
 // ---------------------------------------------------------------------------
 
 model WebhookEndpoint {
-  id       String   @id @default(cuid())
-  url      String
-  label    String?
+  id             String @id @default(cuid())
+  organizationId String
+  url            String
+  label          String?
   // Subset of lib/webhooks/events.ts's WEBHOOK_EVENTS — an endpoint only
   // ever receives deliveries for events it's subscribed to.
   events   String[]
@@ -468,7 +553,10 @@ model WebhookEndpoint {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  deliveries WebhookDelivery[]
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId])
 }
 
 enum WebhookDeliveryStatus {

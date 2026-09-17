@@ -10,11 +10,12 @@ import { writeAuditEvent } from "@/lib/audit/auditLog";
 export const POST = withAuthedJson<undefined, { id: string }>(
   null,
   async ({ session, params }) => {
-    const existing = await getWebhookDelivery(params.id);
+    const existing = await getWebhookDelivery(params.id, session.user.organizationId);
     if (!existing) throw new ApiError(404, "Webhook delivery not found");
 
     const delivery = await replayWebhookDelivery(params.id);
     await writeAuditEvent({
+      organizationId: session.user.organizationId,
       actorId: session.user.id,
       action: "webhook_delivery.replayed",
       entityType: "WebhookDelivery",

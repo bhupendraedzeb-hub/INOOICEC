@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth/auth";
 import { getWebhookEndpoint } from "@/lib/services/webhookEndpoints";
 import { listWebhookDeliveries } from "@/lib/services/webhookDeliveries";
 import { WebhookDeliveryLog } from "@/components/settings/WebhookDeliveryLog";
@@ -9,10 +10,11 @@ export default async function WebhookEndpointDeliveriesPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
   const { id } = await params;
-  const endpoint = await getWebhookEndpoint(id);
+  const endpoint = await getWebhookEndpoint(id, session!.user.organizationId);
   if (!endpoint) notFound();
-  const deliveries = await listWebhookDeliveries({ endpointId: id });
+  const deliveries = await listWebhookDeliveries(session!.user.organizationId, { endpointId: id });
 
   return (
     <div className="max-w-4xl">

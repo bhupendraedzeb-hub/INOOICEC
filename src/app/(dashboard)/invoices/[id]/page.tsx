@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { auth } from "@/lib/auth/auth";
 import { getInvoice } from "@/lib/services/invoices";
 import { listTemplates } from "@/lib/services/templates";
 import { listCustomers } from "@/lib/services/customers";
@@ -20,17 +21,19 @@ export default async function InvoiceDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
+  const organizationId = session!.user.organizationId;
   const { id } = await params;
-  const invoice = await getInvoice(id);
+  const invoice = await getInvoice(id, organizationId);
   if (!invoice) notFound();
 
   if (invoice.status === "DRAFT") {
     const [templates, customers, products] = await Promise.all([
-      listTemplates({}),
-      listCustomers({}),
-      listProducts({}),
+      listTemplates(organizationId, {}),
+      listCustomers(organizationId, {}),
+      listProducts(organizationId, {}),
     ]);
-    const company = await getCompanySettings();
+    const company = await getCompanySettings(organizationId);
 
     return (
       <div>
@@ -79,8 +82,8 @@ export default async function InvoiceDetailPage({
   // internal PDF render route via resolveInvoiceRenderData.
   const [renderData, payments, paymentLinks] = await Promise.all([
     resolveInvoiceRenderData(invoice.id),
-    listPayments({ invoiceId: invoice.id }),
-    listPaymentLinks({ invoiceId: invoice.id }),
+    listPayments(organizationId, { invoiceId: invoice.id }),
+    listPaymentLinks(organizationId, { invoiceId: invoice.id }),
   ]);
   const { layout, context } = renderData!;
 
