@@ -18,6 +18,10 @@ export const invoiceInputSchema = z.object({
   dueDate: z.string().nullish(), // ISO date string
   notes: z.string().nullish(),
   terms: z.string().nullish(),
+  // Optional (not .default()) — keeps older API-key clients that don't send
+  // these working; the service layer applies the AUTO/false default.
+  taxType: z.enum(["AUTO", "FORCE_IGST", "FORCE_CGST_SGST"]).optional(),
+  pricesIncludeTax: z.boolean().optional(),
   items: z.array(invoiceItemInputSchema).min(1, "At least one item is required"),
 });
 

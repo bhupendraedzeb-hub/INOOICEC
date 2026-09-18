@@ -21,23 +21,42 @@ export type LineResult = {
   lineTotal: MoneyValue; // taxableAmount + taxAmount
 };
 
-export function calculateLine(input: LineInput): LineResult {
+export function calculateLine(input: LineInput, opts: { pricesIncludeTax?: boolean } = {}): LineResult {
   const quantity = new Money(input.quantity);
   const rate = new Money(input.rate);
   const discount = new Money(input.discount ?? 0);
   const gstRatePercent = new Money(input.gstRatePercent);
 
   const lineSubtotal = quantity.times(rate);
-  const taxableAmount = lineSubtotal.minus(discount);
-  const taxAmount = taxableAmount.times(gstRatePercent).dividedBy(100);
-  const lineTotal = taxableAmount.plus(taxAmount);
+  const grossAfterDiscount = lineSubtotal.minus(discount);
+
+  let taxableAmount: MoneyValue;
+  let taxAmount: MoneyValue;
+  let lineTotal: MoneyValue;
+
+  if (opts.pricesIncludeTax) {
+    // grossAfterDiscount already includes tax — back-calculate the base so
+    // taxableAmount + taxAmount reconstructs exactly to grossAfterDiscount.
+    const divisor = new Money(1).plus(gstRatePercent.dividedBy(100));
+    taxableAmount = grossAfterDiscount.dividedBy(divisor);
+    taxAmount = grossAfterDiscount.minus(taxableAmount);
+    lineTotal = grossAfterDiscount;
+  } else {
+    taxableAmount = grossAfterDiscount;
+    taxAmount = taxableAmount.times(gstRatePercent).dividedBy(100);
+    lineTotal = taxableAmount.plus(taxAmount);
+  }
 
   return { lineSubtotal, discount, taxableAmount, taxAmount, lineTotal };
 }
 
+export type TaxTypeOverride = "AUTO" | "FORCE_IGST" | "FORCE_CGST_SGST";
+
 export type InvoiceTaxContext = {
   companyStateCode: string;
   customerStateCode: string;
+  taxTypeOverride?: TaxTypeOverride; // default AUTO — same-state-comparison behavior
+  pricesIncludeTax?: boolean; // default false
 };
 
 export type InvoiceCalculationResult = {
@@ -63,8 +82,14 @@ export function calculateInvoiceTotals(
   linesInput: LineInput[],
   ctx: InvoiceTaxContext,
 ): InvoiceCalculationResult {
-  const lines = linesInput.map(calculateLine);
-  const isInterState = ctx.companyStateCode !== ctx.customerStateCode;
+  const lines = linesInput.map((line) => calculateLine(line, { pricesIncludeTax: ctx.pricesIncludeTax }));
+  const autoInterState = ctx.companyStateCode !== ctx.customerStateCode;
+  const isInterState =
+    ctx.taxTypeOverride === "FORCE_IGST"
+      ? true
+      : ctx.taxTypeOverride === "FORCE_CGST_SGST"
+        ? false
+        : autoInterState;
 
   const subtotal = sumMoney(lines.map((l) => l.lineSubtotal));
   const discountTotal = sumMoney(lines.map((l) => l.discount));

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { calculateInvoiceTotals } from "@/lib/calc/gstEngine";
+import { calculateInvoiceTotals, type TaxTypeOverride } from "@/lib/calc/gstEngine";
 import { toMoneyString } from "@/lib/calc/money";
 import { buildRenderContext } from "@/lib/render/buildRenderContext";
 import { InvoiceItemsEditor, type ProductOption } from "@/components/invoices/InvoiceItemsEditor";
@@ -56,6 +56,8 @@ export function InvoiceForm({
     dueDate: string | null;
     notes: string | null;
     terms: string | null;
+    taxType?: TaxTypeOverride;
+    pricesIncludeTax?: boolean;
     items: InvoiceItemInput[];
   };
 }) {
@@ -65,6 +67,8 @@ export function InvoiceForm({
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [terms, setTerms] = useState(initial?.terms ?? "");
+  const [taxType, setTaxType] = useState<TaxTypeOverride>(initial?.taxType ?? "AUTO");
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(initial?.pricesIncludeTax ?? false);
   const [items, setItems] = useState<InvoiceItemInput[]>(
     initial?.items ?? [
       { productId: null, description: "", hsnSac: null, quantity: "1", unit: null, rate: "0.00", discount: "0.00", gstRate: "0.00" },
@@ -103,9 +107,14 @@ export function InvoiceForm({
           discount: item.discount || "0",
           gstRatePercent: item.gstRate || "0",
         })),
-        { companyStateCode: company.stateCode ?? "", customerStateCode: selectedCustomer?.stateCode ?? "" },
+        {
+          companyStateCode: company.stateCode ?? "",
+          customerStateCode: selectedCustomer?.stateCode ?? "",
+          taxTypeOverride: taxType,
+          pricesIncludeTax,
+        },
       ),
-    [items, company.stateCode, selectedCustomer?.stateCode],
+    [items, company.stateCode, selectedCustomer?.stateCode, taxType, pricesIncludeTax],
   );
 
   const context = buildRenderContext({
@@ -162,6 +171,8 @@ export function InvoiceForm({
       dueDate: dueDate || null,
       notes: notes || null,
       terms: terms || null,
+      taxType,
+      pricesIncludeTax,
       items,
     };
     const url = invoiceId ? `/api/v1/invoices/${invoiceId}` : "/api/v1/invoices";
@@ -216,6 +227,29 @@ export function InvoiceForm({
         <div>
           <h3 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-50">Items</h3>
           <InvoiceItemsEditor items={items} onChange={setItems} products={products} />
+        </div>
+
+        <div className="ml-auto flex w-64 flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Tax Type</label>
+            <select
+              className={inputCls}
+              value={taxType}
+              onChange={(e) => setTaxType(e.target.value as TaxTypeOverride)}
+            >
+              <option value="AUTO">Auto (based on state)</option>
+              <option value="FORCE_IGST">Force IGST</option>
+              <option value="FORCE_CGST_SGST">Force CGST+SGST</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            <input
+              type="checkbox"
+              checked={pricesIncludeTax}
+              onChange={(e) => setPricesIncludeTax(e.target.checked)}
+            />
+            Prices include tax
+          </label>
         </div>
 
         <div className="ml-auto w-64 rounded-md border border-zinc-200 p-3 text-sm dark:border-zinc-800">

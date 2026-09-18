@@ -110,6 +110,61 @@ describe("calculateInvoiceTotals — multi-line, discounts, rounding", () => {
   });
 });
 
+describe("calculateInvoiceTotals — prices include tax", () => {
+  it("back-calculates the taxable base from a tax-inclusive rate", () => {
+    // rate 100 @ 5% inclusive -> taxable = 100 / 1.05 ~= 95.24, tax ~= 4.76, total stays 100
+    const result = calculateInvoiceTotals(
+      [{ quantity: 1, rate: "100", gstRatePercent: 5 }],
+      { ...SAME_STATE, pricesIncludeTax: true },
+    );
+    expect(toMoneyString(result.taxableAmount)).toBe("95.24");
+    expect(toMoneyString(result.taxTotal)).toBe("4.76");
+    expect(toMoneyString(result.grandTotal)).toBe("100.00");
+  });
+
+  it("exclusive (default) pricing still adds tax on top of the rate", () => {
+    const result = calculateInvoiceTotals(
+      [{ quantity: 1, rate: "100", gstRatePercent: 5 }],
+      SAME_STATE,
+    );
+    expect(toMoneyString(result.taxableAmount)).toBe("100.00");
+    expect(toMoneyString(result.grandTotal)).toBe("105.00");
+  });
+});
+
+describe("calculateInvoiceTotals — tax type override", () => {
+  it("FORCE_IGST charges IGST even for a same-state customer", () => {
+    const result = calculateInvoiceTotals(
+      [{ quantity: 1, rate: "50000", gstRatePercent: 18 }],
+      { ...SAME_STATE, taxTypeOverride: "FORCE_IGST" },
+    );
+    expect(result.isInterState).toBe(true);
+    expect(toMoneyString(result.igstTotal)).toBe("9000.00");
+    expect(toMoneyString(result.cgstTotal)).toBe("0.00");
+    expect(toMoneyString(result.sgstTotal)).toBe("0.00");
+  });
+
+  it("FORCE_CGST_SGST splits tax 50/50 even for a different-state customer", () => {
+    const result = calculateInvoiceTotals(
+      [{ quantity: 1, rate: "50000", gstRatePercent: 18 }],
+      { ...INTER_STATE, taxTypeOverride: "FORCE_CGST_SGST" },
+    );
+    expect(result.isInterState).toBe(false);
+    expect(toMoneyString(result.cgstTotal)).toBe("4500.00");
+    expect(toMoneyString(result.sgstTotal)).toBe("4500.00");
+    expect(toMoneyString(result.igstTotal)).toBe("0.00");
+  });
+
+  it("AUTO (explicit) matches the default state-comparison behavior", () => {
+    const result = calculateInvoiceTotals(
+      [{ quantity: 1, rate: "50000", gstRatePercent: 18 }],
+      { ...INTER_STATE, taxTypeOverride: "AUTO" },
+    );
+    expect(result.isInterState).toBe(true);
+    expect(toMoneyString(result.igstTotal)).toBe("9000.00");
+  });
+});
+
 describe("derivePaymentStatus", () => {
   const total = new Money("1000");
   const future = new Date(Date.now() + 86_400_000);

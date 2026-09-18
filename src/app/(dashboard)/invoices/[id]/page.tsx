@@ -60,6 +60,8 @@ export default async function InvoiceDetailPage({
             dueDate: invoice.dueDate ? invoice.dueDate.toISOString().slice(0, 10) : null,
             notes: invoice.notes,
             terms: invoice.terms,
+            taxType: invoice.taxType,
+            pricesIncludeTax: invoice.pricesIncludeTax,
             items: invoice.items.map((item) => ({
               productId: item.productId,
               description: item.description,

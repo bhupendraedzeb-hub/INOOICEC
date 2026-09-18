@@ -335,6 +335,15 @@ enum PaymentStatus {
   OVERDUE
 }
 
+// Manual override for the automatic same-state-vs-different-state IGST vs
+// CGST+SGST classification in lib/calc/gstEngine.ts — for edge cases (export,
+// SEZ) where comparing company/customer state codes isn't the right rule.
+enum TaxTypeOverride {
+  AUTO
+  FORCE_IGST
+  FORCE_CGST_SGST
+}
+
 // Atomic, gap-safe invoice number reservation — one row per (prefix,
 // financialYear). Incremented via Prisma upsert, which Postgres implements
 // as INSERT ... ON CONFLICT DO UPDATE, safe under concurrent /issue calls
@@ -380,6 +389,13 @@ model Invoice {
   dueDate   DateTime?
 
   currency String @default("INR")
+
+  // Inputs to lib/calc/gstEngine.ts's calculateInvoiceTotals, set at
+  // create/update time (while still DRAFT) and pinned into the stored totals
+  // below — never recomputed at /issue, same immutability rule as everything
+  // else on this model.
+  taxType          TaxTypeOverride @default(AUTO)
+  pricesIncludeTax Boolean         @default(false)
 
   // Server-computed only (lib/calc/gstEngine.ts) — API layer must ignore any
   // client-sent values for these fields.

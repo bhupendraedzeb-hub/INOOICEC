@@ -7,10 +7,14 @@ import {
   companySettingsSchema,
   type CompanySettingsInput,
 } from "@/lib/validation/schemas/companySettings";
+import { GST_STATE_CODES } from "@/lib/constants/gstStateCodes";
 
 type CompanySettingsData = CompanySettingsInput & { id: string };
 
-const FIELD_GROUPS: Array<{ title: string; fields: Array<{ name: keyof CompanySettingsInput; label: string; type?: string }> }> = [
+const FIELD_GROUPS: Array<{
+  title: string;
+  fields: Array<{ name: keyof CompanySettingsInput; label: string; type?: string; options?: Array<{ value: string; label: string }> }>;
+}> = [
   {
     title: "Identity",
     fields: [
@@ -27,8 +31,12 @@ const FIELD_GROUPS: Array<{ title: string; fields: Array<{ name: keyof CompanySe
       { name: "addressLine1", label: "Address line 1" },
       { name: "addressLine2", label: "Address line 2" },
       { name: "city", label: "City" },
-      { name: "state", label: "State" },
-      { name: "stateCode", label: "State code" },
+      {
+        name: "stateCode",
+        label: "State",
+        type: "select",
+        options: GST_STATE_CODES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` })),
+      },
       { name: "postalCode", label: "Postal code" },
       { name: "country", label: "Country" },
     ],
@@ -83,10 +91,17 @@ export function CompanySettingsForm({
 
   async function onSubmit(data: CompanySettingsInput) {
     setStatus("saving");
+    // `state` (the human-readable name) is derived from the stateCode
+    // dropdown rather than directly editable — it's what folds into the
+    // printed business address, so keep it in sync automatically.
+    const payload: CompanySettingsInput = {
+      ...data,
+      state: GST_STATE_CODES.find((s) => s.code === data.stateCode)?.name ?? null,
+    };
     const res = await fetch("/api/v1/settings/company", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     setStatus(res.ok ? "saved" : "error");
   }
@@ -103,11 +118,25 @@ export function CompanySettingsForm({
               <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 {field.label}
               </label>
-              <input
-                type={field.type ?? "text"}
-                {...register(field.name)}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
-              />
+              {field.type === "select" ? (
+                <select
+                  {...register(field.name)}
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  <option value="">— Select state —</option>
+                  {field.options?.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={field.type ?? "text"}
+                  {...register(field.name)}
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900"
+                />
+              )}
               {errors[field.name] && (
                 <span className="text-xs text-red-600 dark:text-red-400">
                   {errors[field.name]?.message as string}

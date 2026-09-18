@@ -5,16 +5,21 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { customerSchema, type CustomerInput } from "@/lib/validation/schemas/customer";
+import { GST_STATE_CODES } from "@/lib/constants/gstStateCodes";
 
-const FIELDS: Array<{ name: keyof CustomerInput; label: string; type?: string }> = [
+const FIELDS: Array<{ name: keyof CustomerInput; label: string; type?: string; options?: Array<{ value: string; label: string }> }> = [
   { name: "name", label: "Name" },
   { name: "companyName", label: "Company" },
   { name: "gstin", label: "GSTIN" },
   { name: "pan", label: "PAN" },
   { name: "billingAddress", label: "Billing address" },
   { name: "shippingAddress", label: "Shipping address" },
-  { name: "state", label: "State" },
-  { name: "stateCode", label: "State code" },
+  {
+    name: "stateCode",
+    label: "State",
+    type: "select",
+    options: GST_STATE_CODES.map((s) => ({ value: s.code, label: `${s.name} (${s.code})` })),
+  },
   { name: "phone", label: "Phone" },
   { name: "email", label: "Email", type: "email" },
 ];
@@ -39,11 +44,18 @@ export function CustomerForm({
 
   async function onSubmit(data: CustomerInput) {
     setServerError(null);
+    // `state` (the human-readable name) is derived from the stateCode
+    // dropdown rather than directly editable — keeps the printed business
+    // address in sync without letting the two fields drift out of sync.
+    const payload: CustomerInput = {
+      ...data,
+      state: GST_STATE_CODES.find((s) => s.code === data.stateCode)?.name ?? null,
+    };
     const url = customerId ? `/api/v1/customers/${customerId}` : "/api/v1/customers";
     const res = await fetch(url, {
       method: customerId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       setServerError("Failed to save customer.");
@@ -58,11 +70,25 @@ export function CustomerForm({
       {FIELDS.map((field) => (
         <div key={field.name} className="flex flex-col gap-1">
           <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{field.label}</label>
-          <input
-            type={field.type ?? "text"}
-            {...register(field.name)}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-          />
+          {field.type === "select" ? (
+            <select
+              {...register(field.name)}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              <option value="">— Select state —</option>
+              {field.options?.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type={field.type ?? "text"}
+              {...register(field.name)}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          )}
           {errors[field.name] && (
             <span className="text-xs text-red-600 dark:text-red-400">
               {errors[field.name]?.message as string}

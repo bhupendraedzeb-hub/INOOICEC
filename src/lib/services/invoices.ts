@@ -126,7 +126,12 @@ async function computeInvoiceCalc(input: InvoiceInput, customerId: string, organ
       discount: item.discount ?? "0",
       gstRatePercent: item.gstRate,
     })),
-    { companyStateCode: company.stateCode ?? "", customerStateCode: customer.stateCode ?? "" },
+    {
+      companyStateCode: company.stateCode ?? "",
+      customerStateCode: customer.stateCode ?? "",
+      taxTypeOverride: input.taxType ?? "AUTO",
+      pricesIncludeTax: input.pricesIncludeTax ?? false,
+    },
   );
 
   return { calc, company, customer };
@@ -167,6 +172,8 @@ export async function createInvoiceDraft(input: InvoiceInput, actorId: string, o
       terms: input.terms || null,
       currency: company.currency,
       createdById: actorId,
+      taxType: input.taxType ?? "AUTO",
+      pricesIncludeTax: input.pricesIncludeTax ?? false,
       subtotal: toMoneyString(calc.subtotal),
       discountTotal: toMoneyString(calc.discountTotal),
       taxableAmount: toMoneyString(calc.taxableAmount),
@@ -205,6 +212,8 @@ export async function updateInvoiceDraft(id: string, organizationId: string, inp
         dueDate,
         notes: input.notes || null,
         terms: input.terms || null,
+        taxType: input.taxType ?? "AUTO",
+        pricesIncludeTax: input.pricesIncludeTax ?? false,
         subtotal: toMoneyString(calc.subtotal),
         discountTotal: toMoneyString(calc.discountTotal),
         taxableAmount: toMoneyString(calc.taxableAmount),
@@ -300,6 +309,8 @@ export async function duplicateInvoice(id: string, organizationId: string, actor
       terms: source.terms,
       currency: source.currency,
       createdById: actorId,
+      taxType: source.taxType,
+      pricesIncludeTax: source.pricesIncludeTax,
       subtotal: source.subtotal,
       discountTotal: source.discountTotal,
       taxableAmount: source.taxableAmount,
