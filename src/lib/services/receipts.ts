@@ -67,7 +67,7 @@ export async function listReceipts(organizationId: string, opts: { paymentId?: s
       ...(opts.paymentId ? { paymentId: opts.paymentId } : {}),
       ...(opts.invoiceId ? { payment: { invoiceId: opts.invoiceId } } : {}),
     },
-    include: { payment: true },
+    include: { payment: { include: { invoice: { include: { customer: true } } } } },
     orderBy: { createdAt: "desc" },
   });
 }

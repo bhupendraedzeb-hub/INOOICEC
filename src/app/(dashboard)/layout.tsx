@@ -8,6 +8,7 @@ const NAV_GROUPS: Array<{ title: string; links: Array<{ href: string; label: str
     links: [
       { href: "/dashboard", label: "Dashboard" },
       { href: "/invoices", label: "Invoices" },
+      { href: "/receipts", label: "Receipts" },
     ],
   },
   {
