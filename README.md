@@ -2,7 +2,7 @@
 
 Self-hosted invoice management platform. Not a SaaS product in the commercial sense — no subscriptions, template tiers, marketplace, or billing — but it is multi-tenant: public signup (`/signup`) creates a brand-new, fully isolated `Organization` per signup, and organizations never share data with one another. Within an organization, the OWNER/ADMIN can add more team members (`Settings > Team`).
 
-See `agent/AGENTS.md` and `agent/PHASE.md` for the original product/technical specification and its Phase 0–19 V1 scope, and `plan.md` for the technical assessment, phased implementation plan, and the post-V1 additions (Phase 20 multi-tenancy, Phase 21 payment receipts) this project follows.
+See `agent/AGENTS.md` and `agent/PHASE.md` for the original product/technical specification and its Phase 0–19 V1 scope, and `plan.md` for the technical assessment, phased implementation plan, and the post-V1 additions (Phase 20 multi-tenancy, Phase 21 payment receipts) this project follows. See `API.md` for the full REST API reference (authentication, every endpoint, outbound webhook signing).
 
 ## Stack
 
