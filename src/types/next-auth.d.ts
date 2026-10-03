@@ -13,6 +13,7 @@ declare module "next-auth" {
     role: string;
     tokenVersion: number;
     organizationId: string;
+    isActive: boolean;
   }
 }
 

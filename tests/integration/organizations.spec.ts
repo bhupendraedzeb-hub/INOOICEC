@@ -88,7 +88,11 @@ test.describe("Multi-tenant organizations", () => {
   test("org B's own list endpoints never include org A's data", async () => {
     expect(await (await orgB.get("/api/v1/customers")).json()).toEqual([]);
     expect(await (await orgB.get("/api/v1/invoices")).json()).toEqual([]);
-    expect(await (await orgB.get("/api/v1/templates")).json()).toEqual([]);
+    // Every org auto-provisions its own default template at signup
+    // (organizations.ts) — org B has exactly that one, and never org A's.
+    const orgBTemplates = await (await orgB.get("/api/v1/templates")).json();
+    expect(orgBTemplates.map((t: { id: string }) => t.id)).not.toContain(orgATemplateId);
+    expect(orgBTemplates.every((t: { name: string }) => !t.name.startsWith(TEST_PREFIX))).toBe(true);
   });
 
   test("org A can still fully access its own resources", async () => {

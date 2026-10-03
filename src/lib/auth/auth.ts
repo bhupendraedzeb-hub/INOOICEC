@@ -1,16 +1,36 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { Adapter } from "next-auth/adapters";
 import argon2 from "argon2";
 import { db } from "@/lib/db";
 import { loginSchema } from "@/lib/validation/schemas/auth";
+import { provisionOrganizationAndOwner } from "@/lib/services/organizations";
 import { writeAuditEvent } from "@/lib/audit/auditLog";
 
+const prismaAdapter = PrismaAdapter(db);
+
+// PrismaAdapter's default createUser only knows about the Auth.js-standard
+// User columns (email/name/image/emailVerified) — it has no way to fill our
+// app-specific required columns (organizationId, role). Overriding just this
+// one method lets a brand-new Google sign-in provision a full Organization +
+// OWNER user (same starter templates as /signup) atomically, so the rest of
+// the adapter (account linking, session/token lookups) stays untouched.
+const adapter: Adapter = {
+  ...prismaAdapter,
+  async createUser(data) {
+    const { user } = await provisionOrganizationAndOwner({
+      organizationName: `${data.name ?? data.email}'s Organization`,
+      email: data.email,
+      name: data.name ?? data.email,
+    });
+    return { ...user, email: user.email, emailVerified: data.emailVerified ?? null };
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Kept for future OAuth providers; not used for session persistence since
-  // Credentials-only sign-in requires the JWT strategy (see schema.prisma
-  // User.tokenVersion for how revocation is achieved instead).
-  adapter: PrismaAdapter(db),
+  adapter,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
@@ -25,7 +45,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const { email, password } = parsed.data;
 
         const user = await db.user.findUnique({ where: { email } });
-        if (!user || !user.isActive) return null;
+        // No passwordHash means this account was created via an OAuth
+        // provider (e.g. Google) and has never set a password.
+        if (!user || !user.isActive || !user.passwordHash) return null;
 
         const valid = await argon2.verify(user.passwordHash, password);
         if (!valid) return null;
@@ -37,11 +59,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           tokenVersion: user.tokenVersion,
           organizationId: user.organizationId,
+          isActive: user.isActive,
         };
       },
     }),
+    Google({
+      // Google verifies the email on its end, so a sign-in using an email
+      // that already has a credentials-created account is trusted to be the
+      // same person and gets linked to that existing account rather than
+      // rejected with OAuthAccountNotLinked.
+      allowDangerousEmailAccountLinking: true,
+    }),
   ],
   callbacks: {
+    async signIn({ user }) {
+      // Blocks both providers: a deactivated user can't start a new session
+      // even though the jwt callback below would also catch it on refresh.
+      if (user.isActive === false) return false;
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.uid = user.id;

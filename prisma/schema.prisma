@@ -59,7 +59,9 @@ model User {
   organizationId String
   email          String   @unique
   name           String
-  passwordHash   String
+  // Null for accounts created via an OAuth provider (e.g. Google) that have
+  // never set a password — Credentials sign-in rejects those (see auth.ts).
+  passwordHash String?
   role           UserRole @default(STAFF)
   isActive       Boolean  @default(true)
   // Bumped to invalidate all outstanding JWT sessions for this user (revocation

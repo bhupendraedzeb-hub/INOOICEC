@@ -2,7 +2,10 @@ import Link from "next/link";
 import { auth } from "@/lib/auth/auth";
 import { getDashboardSummary } from "@/lib/services/dashboard";
 import { listInvoices } from "@/lib/services/invoices";
+import { listCustomers } from "@/lib/services/customers";
+import { getCompanySettings } from "@/lib/services/companySettings";
 import { Badge } from "@/components/invoices/StatusBadge";
+import { GettingStarted } from "@/components/dashboard/GettingStarted";
 import type { InvoiceStatus, PaymentStatus } from "@/generated/prisma/client";
 
 const FILTERS: { key: string; label: string; query: { status?: InvoiceStatus; paymentStatus?: PaymentStatus } }[] = [
@@ -38,14 +41,23 @@ export default async function DashboardPage({
   // Both go through listInvoices, so the time-dependent OVERDUE sync
   // (syncOverdueInvoices) always runs before either the cards or the table
   // below are computed — the two can never disagree about what's overdue.
-  const [summary, invoices] = await Promise.all([
+  const [summary, invoices, anyInvoice, customers, company] = await Promise.all([
     getDashboardSummary(session!.user.organizationId),
     listInvoices(session!.user.organizationId, { ...active.query, limit: 20 }),
+    listInvoices(session!.user.organizationId, { limit: 1 }),
+    listCustomers(session!.user.organizationId, {}),
+    getCompanySettings(session!.user.organizationId),
   ]);
 
   return (
     <div>
       <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Dashboard</h1>
+
+      <GettingStarted
+        hasCompanyDetails={Boolean(company.gstin)}
+        hasCustomer={customers.length > 0}
+        hasInvoice={anyInvoice.length > 0}
+      />
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Card label="Total Invoices" value={String(summary.totalInvoices)} href="/dashboard?filter=all" />

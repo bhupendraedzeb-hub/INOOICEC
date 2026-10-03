@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { templateDocumentSchema } from "./template";
-import { DEFAULT_TEMPLATE_DOCUMENT } from "@/types/template";
+import { DEFAULT_TEMPLATE_DOCUMENT, STARTER_INVOICE_LAYOUT, STARTER_RECEIPT_LAYOUT } from "@/types/template";
 
 const baseComponent = {
   id: "c1",
@@ -100,5 +100,15 @@ describe("templateDocumentSchema", () => {
   it("rejects an invalid page orientation", () => {
     const doc = { ...DEFAULT_TEMPLATE_DOCUMENT, page: { ...DEFAULT_TEMPLATE_DOCUMENT.page, orientation: "sideways" } };
     expect(templateDocumentSchema.safeParse(doc).success).toBe(false);
+  });
+
+  it("accepts the auto-provisioned starter invoice layout", () => {
+    const result = templateDocumentSchema.safeParse(STARTER_INVOICE_LAYOUT);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts the auto-provisioned starter receipt layout", () => {
+    const result = templateDocumentSchema.safeParse(STARTER_RECEIPT_LAYOUT);
+    expect(result.success).toBe(true);
   });
 });

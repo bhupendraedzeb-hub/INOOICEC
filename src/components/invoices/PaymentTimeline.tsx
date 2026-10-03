@@ -71,7 +71,7 @@ export function PaymentTimeline({ payments }: { payments: PaymentRow[] }) {
         {payments.map((p) => (
           <tr key={p.id} className="border-b border-zinc-100 dark:border-zinc-900">
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">
-              {new Date(p.paymentDate).toLocaleDateString("en-IN")}
+              {new Date(p.paymentDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
             </td>
             <td className={`py-1.5 ${p.isVoided ? "text-zinc-400 line-through" : "text-zinc-900 dark:text-zinc-50"}`}>
               {p.amount}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signIn } from "@/lib/auth/auth";
 import { AuthError } from "next-auth";
+import { GoogleIcon } from "@/components/auth/GoogleIcon";
 
 export default async function LoginPage({
   searchParams,
@@ -24,6 +25,11 @@ export default async function LoginPage({
       }
       throw err;
     }
+  }
+
+  async function loginWithGoogle() {
+    "use server";
+    await signIn("google", { redirectTo: "/dashboard" });
   }
 
   return (
@@ -74,6 +80,23 @@ export default async function LoginPage({
             Sign in
           </button>
         </form>
+
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">or</span>
+          <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+        </div>
+
+        <form action={loginWithGoogle}>
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          >
+            <GoogleIcon />
+            Continue with Google
+          </button>
+        </form>
+
         <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
           New here?{" "}
           <Link href="/signup" className="text-zinc-900 hover:underline dark:text-zinc-50">

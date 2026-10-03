@@ -51,7 +51,7 @@ export function ApiKeyList({ keys, canManage }: { keys: ApiKeyRow[]; canManage: 
             <td className="py-1.5 text-xs text-zinc-600 dark:text-zinc-400">{k.scopes.join(", ")}</td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">{k.createdBy?.name ?? "—"}</td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">
-              {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString("en-IN") : "Never"}
+              {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Never"}
             </td>
             <td className="py-1.5">
               {k.revokedAt ? (

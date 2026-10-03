@@ -54,7 +54,7 @@ export function PaymentLinkList({ links }: { links: PaymentLinkRow[] }) {
             <td className="py-1.5 text-zinc-900 dark:text-zinc-50">{l.amount}</td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">{l.provider}</td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">
-              {l.expiresAt ? new Date(l.expiresAt).toLocaleDateString("en-IN") : "—"}
+              {l.expiresAt ? new Date(l.expiresAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
             </td>
             <td className="py-1.5">
               <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_CLS[l.status] ?? ""}`}>{l.status}</span>

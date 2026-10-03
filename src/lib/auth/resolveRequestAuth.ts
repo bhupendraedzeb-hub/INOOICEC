@@ -57,6 +57,10 @@ export async function resolveRequestAuth(request: NextRequest): Promise<Resolved
           role: actor.role,
           tokenVersion: 0,
           organizationId: candidate.organizationId,
+          // Always true here — an API key's createdBy can't be looked up at
+          // all if their row is gone, and deactivation doesn't revoke keys
+          // they previously created (only explicit key revocation does).
+          isActive: true,
         },
         expires: new Date(Date.now() + 60_000).toISOString(),
       };

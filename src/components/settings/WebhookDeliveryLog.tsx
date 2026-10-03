@@ -59,7 +59,7 @@ export function WebhookDeliveryLog({ deliveries }: { deliveries: WebhookDelivery
             </td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">{d.attempts}</td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">
-              {d.lastAttemptAt ? new Date(d.lastAttemptAt).toLocaleString("en-IN") : "—"}
+              {d.lastAttemptAt ? new Date(d.lastAttemptAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
             </td>
             <td className="py-1.5 text-zinc-600 dark:text-zinc-400">{d.responseStatus ?? "—"}</td>
             <td className="max-w-xs truncate py-1.5 text-xs text-red-600 dark:text-red-400">{d.error ?? "—"}</td>

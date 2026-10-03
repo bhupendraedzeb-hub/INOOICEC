@@ -9,6 +9,12 @@ export async function cleanupTestData() {
   const invoiceIds = invoices.map((i) => i.id);
   if (invoiceIds.length > 0) {
     await db.paymentLink.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+    // Every org now has a default ReceiptTemplate (auto-provisioned at
+    // signup — organizations.ts), so recording a payment in these tests
+    // actually generates a Receipt (Receipt.paymentId FK) rather than
+    // best-effort skipping it — must go before deleting the Payment it
+    // references.
+    await db.receipt.deleteMany({ where: { payment: { invoiceId: { in: invoiceIds } } } });
     await db.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
     await db.invoiceItem.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
     await db.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
@@ -55,6 +61,7 @@ export async function cleanupTestData() {
     const orgInvoiceIds = orgInvoices.map((i) => i.id);
     if (orgInvoiceIds.length > 0) {
       await db.paymentLink.deleteMany({ where: { invoiceId: { in: orgInvoiceIds } } });
+      await db.receipt.deleteMany({ where: { organizationId } });
       await db.payment.deleteMany({ where: { invoiceId: { in: orgInvoiceIds } } });
       await db.invoiceItem.deleteMany({ where: { invoiceId: { in: orgInvoiceIds } } });
       await db.invoice.deleteMany({ where: { id: { in: orgInvoiceIds } } });
@@ -68,6 +75,16 @@ export async function cleanupTestData() {
     if (orgTemplateIds.length > 0) {
       await db.templateVersion.deleteMany({ where: { templateId: { in: orgTemplateIds } } });
       await db.template.deleteMany({ where: { id: { in: orgTemplateIds } } });
+    }
+    // Every org auto-provisions a default ReceiptTemplate at signup
+    // (organizations.ts) alongside the invoice Template above — same
+    // cleanup-before-user-delete requirement (ReceiptTemplate/
+    // ReceiptTemplateVersion.createdById both FK to User).
+    const orgReceiptTemplates = await db.receiptTemplate.findMany({ where: { organizationId }, select: { id: true } });
+    const orgReceiptTemplateIds = orgReceiptTemplates.map((t) => t.id);
+    if (orgReceiptTemplateIds.length > 0) {
+      await db.receiptTemplateVersion.deleteMany({ where: { templateId: { in: orgReceiptTemplateIds } } });
+      await db.receiptTemplate.deleteMany({ where: { id: { in: orgReceiptTemplateIds } } });
     }
     await db.invoiceNumberCounter.deleteMany({ where: { organizationId } });
     await db.auditLog.deleteMany({ where: { organizationId } });

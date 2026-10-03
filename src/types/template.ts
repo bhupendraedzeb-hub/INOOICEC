@@ -148,3 +148,74 @@ export const DEFAULT_TEMPLATE_DOCUMENT: TemplateDocument = {
   },
   components: [],
 };
+
+const STARTER_PAGE = DEFAULT_TEMPLATE_DOCUMENT.page;
+
+function structuralComponent(
+  id: string,
+  type: ComponentType,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): ComponentNode {
+  return { id, type, x, y, width, height, locked: false, visible: true, zIndex: 1, props: {} };
+}
+
+// Auto-provisioned for every new organization at signup (organizations.ts)
+// so a first-time user can issue a real, professional-looking invoice
+// immediately — without ever opening the drag-and-drop builder. Every block
+// here is a structural/composite component (src/lib/render/components.tsx
+// already knows how to render each from just its type + position), so this
+// is pure layout data, not a special rendering path. Coordinates are mm,
+// relative to the page's content box (inside the margins) per
+// TemplateRenderer.tsx. Users can still open this in the builder afterward
+// to restyle or rearrange it like any other template.
+export const STARTER_INVOICE_LAYOUT: TemplateDocument = {
+  page: STARTER_PAGE,
+  components: [
+    structuralComponent("header", "header", 0, 0, 180, 14),
+    structuralComponent("business", "businessDetails", 0, 16, 88, 30),
+    structuralComponent("invoiceDetails", "invoiceDetails", 92, 16, 88, 30),
+    structuralComponent("customer", "customerDetails", 0, 48, 88, 30),
+    {
+      ...structuralComponent("items", "itemsTable", 0, 80, 180, 100),
+      props: {
+        columns: [
+          { key: "index", label: "#", widthPercent: 5, align: "center" },
+          { key: "item", label: "Item", widthPercent: 25 },
+          { key: "hsn", label: "HSN/SAC", widthPercent: 10 },
+          { key: "qty", label: "Qty", widthPercent: 8, align: "right" },
+          { key: "unit", label: "Unit", widthPercent: 8 },
+          { key: "rate", label: "Rate", widthPercent: 12, align: "right" },
+          { key: "gstPercent", label: "GST%", widthPercent: 7, align: "right" },
+          { key: "taxAmount", label: "Tax", widthPercent: 10, align: "right" },
+          { key: "amount", label: "Amount", widthPercent: 15, align: "right" },
+        ],
+        repeatHeaderOnEachPage: true,
+      } satisfies ItemsTableProps,
+    },
+    structuralComponent("taxSummary", "taxSummary", 0, 184, 86, 36),
+    structuralComponent("totals", "totals", 92, 184, 88, 36),
+    structuralComponent("paymentDetails", "paymentDetails", 0, 224, 86, 20),
+    structuralComponent("signature", "signature", 92, 224, 88, 20),
+    structuralComponent("terms", "terms", 0, 248, 180, 10),
+    structuralComponent("footer", "footer", 0, 262, 180, 5),
+  ],
+};
+
+// Same idea as STARTER_INVOICE_LAYOUT, for receipts — shorter document so
+// the blocks sit near the top of the page rather than spanning it.
+export const STARTER_RECEIPT_LAYOUT: TemplateDocument = {
+  page: STARTER_PAGE,
+  components: [
+    structuralComponent("header", "header", 0, 0, 180, 14),
+    structuralComponent("business", "businessDetails", 0, 16, 88, 30),
+    structuralComponent("receiptDetails", "receiptDetails", 92, 16, 88, 24),
+    structuralComponent("customer", "customerDetails", 0, 48, 88, 30),
+    structuralComponent("paymentSummary", "paymentSummary", 92, 48, 88, 34),
+    structuralComponent("paymentDetails", "paymentDetails", 0, 86, 88, 22),
+    structuralComponent("signature", "signature", 92, 86, 88, 22),
+    structuralComponent("footer", "footer", 0, 112, 180, 6),
+  ],
+};
